@@ -25,6 +25,7 @@
  *  permissions and limitations under the License.
  *
  */
+ 
  /*
  * 	Original license:
  *
@@ -102,7 +103,7 @@ definition(
     namespace: "ipstas",
     author: "HundredGraphs",
     description: "Allows you to choose devices and attributes and it logs the device, event name, event value, event time, and event description of all the events that have occured since the last time it ran.",
-    category: "Tools",
+    category: "My Apps",
     iconUrl: "https://raw.githubusercontent.com/krlaframboise/Resources/master/simple-event-logger/app-SimpleEventLogger.png",
     iconX2Url: "https://raw.githubusercontent.com/krlaframboise/Resources/master/simple-event-logger/app-SimpleEventLogger@2x.png",
     iconX3Url: "https://raw.githubusercontent.com/krlaframboise/Resources/master/simple-event-logger/app-SimpleEventLogger@3x.png")
