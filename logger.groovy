@@ -104,9 +104,9 @@ definition(
     author: "HundredGraphs",
     description: "Allows you to choose devices and attributes and it logs the device, event name, event value, event time, and event description of all the events that have occured since the last time it ran.",
     category: "My Apps",
-    iconUrl: "https://raw.githubusercontent.com/krlaframboise/Resources/master/simple-event-logger/app-SimpleEventLogger.png",
-    iconX2Url: "https://raw.githubusercontent.com/krlaframboise/Resources/master/simple-event-logger/app-SimpleEventLogger@2x.png",
-    iconX3Url: "https://raw.githubusercontent.com/krlaframboise/Resources/master/simple-event-logger/app-SimpleEventLogger@3x.png")
+    iconUrl: "https://res.cloudinary.com/orangry/image/upload/v1554557246/hundredgraphs/HundredGraphs_620x620.png",
+    iconX2Url: "https://res.cloudinary.com/orangry/image/upload/v1554557246/hundredgraphs/HundredGraphs_620x620.png",
+    iconX3Url: "https://res.cloudinary.com/orangry/image/upload/v1554557246/hundredgraphs/HundredGraphs_620x620.png")
 		
 preferences {
 	page(name: "mainPage")
@@ -158,7 +158,7 @@ def mainPage() {
 			label title: "Assign a name", required: false
 			mode title: "Set for specific mode(s)", required: false
 			if (state.installed) {		
-				getPageLink("aboutPageLink", "About Simple Event Logger", "aboutPage", null, "Tap to view documentation, version and additional information.", "https://raw.githubusercontent.com/krlaframboise/Resources/master/simple-event-logger/app-SimpleEventLogger@3x.png")
+				getPageLink("aboutPageLink", "About Simple Event Logger", "aboutPage", null, "Tap to view documentation, version and additional information.", "https://res.cloudinary.com/orangry/image/upload/v1554557246/hundredgraphs/HundredGraphs_620x620.png")
 			}
 		}
 		section("  ") {
@@ -183,22 +183,22 @@ def aboutPage() {
 		section() {		
 			def gsVerActual = state.loggingStatus?.gsVersion ?: "?"
 			
-			def gsVerExpectedMsg = (gsVersion() == gsVerActual) ? "" : " (expected version is ${gsVersion()})"
+			// def gsVerExpectedMsg = (gsVersion() == gsVerActual) ? "" : " (expected version is ${gsVersion()})"
 		
-			paragraph image: "https://raw.githubusercontent.com/krlaframboise/Resources/master/simple-event-logger/app-SimpleEventLogger@3x.png",
-				title: "Simple Event Logger\nBy Kevin LaFramboise (@krlaframboise)",
+			paragraph image: "https://res.cloudinary.com/orangry/image/upload/v1554557246/hundredgraphs/HundredGraphs_620x620.png",
+				title: "HundredGraphs Logger\nBy ipstas (@ipstas)",
 				required: false,
 				"Allows you to choose devices and attributes and it logs the device, event name, event value, event time, and event description of all the events that have occured since the last time it ran."
 				
 			paragraph title: "Version",
 				required: false,
-				"SmartApp: ${version()}\nGoogle Script: ${gsVerActual}${gsVerExpectedMsg}"
+				"SmartApp: ${version()}"
 				
 			 href(name: "documentationLink",
 				 title: "View Documentation",
 				 required: false,
 				 style: "external",
-				 url: "http://htmlpreview.github.com/?https://raw.githubusercontent.com/krlaframboise/SmartThings/master/smartapps/krlaframboise/simple-event-logger.src/ReadMe.md",
+				 url: "http://htmlpreview.github.com/?https://github.com/ipstas/ipstas-smarththings-hundredgraphs/blob/master/README.md",
 				 description: "Additional information about the SmartApp and installation instructions.")
 		}		
 	}
@@ -362,8 +362,9 @@ private getOptionsPageContent() {
 	section("${getWebAppName()}") {		
 		input "googleWebAppUrl", "text",
 			title: "${getWebAppName()} Url",
+			defaultValue: ${loggerUrlDev},
 			required: true
-		paragraph "The url you enter into this field needs to start with: ${webAppBaseUrl} or ${webAppBaseUrl2}"
+		paragraph "The url you enter into this field needs to start with: ${loggerUrl} or ${loggerUrlDev}"
 		paragraph "If your url does not start like that, go back and copy it from the Script Editor Publish screen in the Google Sheet."		
 	}
 	
@@ -459,7 +460,7 @@ def updated() {
 	
 	initializeAppEndpoint()
 	
-	if (settings?.logFrequency && settings?.maxEvents && settings?.logDesc != null && verifyWebAppUrl(settings?.googleWebAppUrl)) {
+	if (settings?.logFrequency && settings?.maxEvents && settings?.logDesc != null && verifyWebAppUrl(loggerUrl)) {
 		state.optionsConfigured = true
 	}
 	else {
@@ -488,7 +489,7 @@ def updated() {
 		
 		"runEvery${logFrequency}"(logNewEvents)
 		
-		verifyGSVersion()
+		//verifyGSVersion()
 		runIn(10, startLogNewEvents)
 	}
 	else {
@@ -501,11 +502,11 @@ private verifyWebAppUrl(url) {
 		logDebug "The ${getWebAppName()} Url field is required"
 		return false
 	}
-	else if ("$url"?.toLowerCase()?.startsWith(webAppBaseUrl) || "$url"?.toLowerCase()?.startsWith(webAppBaseUrl2)) {
+	else if ("$url"?.toLowerCase()?.startsWith(loggerUrl) || "$url"?.toLowerCase()?.startsWith(loggerUrlDev)) {
 		return true
 	}
 	else {		
-		logWarn "The ${webAppName} Url is not valid.  Go back and copy the url from the Google Sheets Script Editor Publish page."
+		logWarn "The ${webAppName} Url is not valid"
 		return false
 	}
 }
@@ -626,7 +627,7 @@ private getLogCatchUpFrequencySettingMS() {
 private postEventsToGoogleSheets(events) {
 	def jsonOutput = new groovy.json.JsonOutput()
 	def jsonData = jsonOutput.toJson([
-		postBackUrl: "${state.endpoint}update-logging-status",
+		postBackUrl: "${state.endpoint}logger",
 		archiveOptions: getArchiveOptions(),
 		logDesc: (settings?.logDesc != false),
 		logReporting: (settings?.logReporting == true),
@@ -1002,6 +1003,13 @@ private getArchiveTypeOptions() {
 
 private getWebAppName() {
 	return "HundredGraph Logger"
+}
+
+private loggerUrl() {
+	return "https://www.hundredgraphs.com/hook/"
+}
+private loggerUrlDev() {
+	return "http://dev.hundredgraphs.com/hook/"
 }
 
 private getWebAppBaseUrl() {
