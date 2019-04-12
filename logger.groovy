@@ -158,7 +158,7 @@ def mainPage() {
 			label title: "Assign a name", required: false
 			mode title: "Set for specific mode(s)", required: false
 			if (state.installed) {		
-				getPageLink("aboutPageLink", "About Simple Event Logger", "aboutPage", null, "Tap to view documentation, version and additional information.", "https://res.cloudinary.com/orangry/image/upload/v1554557246/hundredgraphs/HundredGraphs_620x620.png")
+				getPageLink("aboutPageLink", "About HundredGraphs Logger", "aboutPage", null, "Tap to view documentation, version and additional information.", "https://res.cloudinary.com/orangry/image/upload/v1554557246/hundredgraphs/HundredGraphs_620x620.png")
 			}
 		}
 		section("  ") {
@@ -313,6 +313,10 @@ def optionsPage() {
 
 private getOptionsPageContent() {
 	section ("Logging Options") {
+		input "apiKey", "text",
+			title: "API key:",
+			defaultValue: "None",
+			required: true
 		input "logFrequency", "enum",
 			title: "Log Events Every:",
 			required: false,
@@ -462,29 +466,35 @@ def updated() {
 	
 	logDebug "[updated] freq: ${settings?.logFrequency}, url: ${settings?.loggerAppUrl}"
 	
-	if (settings?.logFrequency && settings?.maxEvents && settings?.logDesc != null && verifyWebAppUrl(settings?.loggerAppUrl)) {
-		state.optionsConfigured = true
+	state.app = "SmartThings"
+	//state.version = ${version()}
+
+	if (settings?.apiKey) {
+		state.apiKey = settings?.apiKey
+	}	else {
+		logDebug "Unconfigured - you need API key ${settings?.apiKey}"
 	}
-	else {
+
+	if (settings?.apiKey && settings?.logFrequency && settings?.maxEvents && settings?.logDesc != null && verifyWebAppUrl(settings?.loggerAppUrl)) {
+		state.optionsConfigured = true
+	}	else {
 		logDebug "Unconfigured - Options. ${loggerUrlDev()} settings?.loggerAppUrl"
 		state.optionsConfigured = false
 	}
 	
 	if (settings?.allowedAttributes) {
 		state.attributesConfigured = true
-	}
-	else {
+	}	else {
 		logDebug "Unconfigured - Choose Events"
 	}
 	
 	if (getSelectedDevices()) {
 		state.devicesConfigured = true
-	}
-	else {
+	}	else {
 		logDebug "Unconfigured - Choose Devices"
 	}
 	
-	state.allConfigured = (state.optionsConfigured && state.attributesConfigured && state.devicesConfigured)
+	state.allConfigured = (state.apiKey && state.optionsConfigured && state.attributesConfigured && state.devicesConfigured)
 	
 	if  (state.allConfigured) {
 		def logFrequency = (settings?.logFrequency ?: "10 Minutes").replace(" ", "")
@@ -494,7 +504,7 @@ def updated() {
 		//verifyGSVersion()
 		runIn(10, startLogNewEvents)
 	} else {
-		logDebug "Event Logging is disabled because there are unconfigured settings."
+		logWarn "Event Logging is disabled because there are unconfigured settings. ${settings?.loggerAppUrl}, ${settings?.apiKey}"
 	}
 }
 
@@ -576,7 +586,7 @@ def logNewEvents() {
 	logDebug "SmartThings found ${String.format('%,d', eventCount)} events between ${getFormattedLocalTime(startDate.time)} and ${getFormattedLocalTime(endDate.time)}${actionMsg}"
 	
 	if (events) {
-		postEventsToGoogleSheets(events)
+		postEventsToLogger(events)
 	}
 	else {		
 		state.loggingStatus.success = true
@@ -626,9 +636,10 @@ private getLogCatchUpFrequencySettingMS() {
 	return (minutesVal * 60 * 1000)
 }
 
-private postEventsToGoogleSheets(events) {
+private postEventsToLogger(events) {
 	def jsonOutput = new groovy.json.JsonOutput()
 	def jsonData = jsonOutput.toJson([
+		apiKey: settings?.apiKey,
 		postBackUrl: "${state.endpoint}logger",
 		archiveOptions: getArchiveOptions(),
 		logDesc: (settings?.logDesc != false),
@@ -644,7 +655,7 @@ private postEventsToGoogleSheets(events) {
 		body: jsonData
 	]	
 	
-	logDebug("[postEventsToGoogleSheets] ${jsonData} ${params}")
+	logDebug("[postEventsToLogger] ${jsonData} ${params}")
 	asynchttp_v1.post(processLogEventsResponse, params)
 }
 
