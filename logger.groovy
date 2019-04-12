@@ -115,7 +115,7 @@ preferences {
 	page(name: "attributeExclusionsPage")
 	page(name: "optionsPage")
 	page(name: "aboutPage")
-	page(name: "createTokenPage")
+	//page(name: "createTokenPage")
 }
 
 def version() { return "00.00.01" }
@@ -186,7 +186,7 @@ def aboutPage() {
 			// def gsVerExpectedMsg = (gsVersion() == gsVerActual) ? "" : " (expected version is ${gsVersion()})"
 		
 			paragraph image: "https://res.cloudinary.com/orangry/image/upload/v1554557246/hundredgraphs/HundredGraphs_620x620.png",
-				title: "HundredGraphs Logger\nBy ipstas (@ipstas)",
+				title: "HundredGraphs Logger\nby ipstas (@ipstas)",
 				required: false,
 				"Allows you to choose devices and attributes and it logs the device, event name, event value, event time, and event description of all the events that have occured since the last time it ran."
 				
@@ -316,8 +316,8 @@ private getOptionsPageContent() {
 		input "logFrequency", "enum",
 			title: "Log Events Every:",
 			required: false,
-			defaultValue: "5 Minutes",
-			options: ["5 Minutes", "10 Minutes", "15 Minutes", "30 Minutes", "1 Hour", "3 Hours"]
+			defaultValue: "1 Minute",
+			options: ["1 Minute", "5 Minutes", "10 Minutes", "15 Minutes", "30 Minutes", "1 Hour", "3 Hours"]
 		input "logCatchUpFrequency", "enum",
 			title: "Maximum Catch-Up Interval:\n(Must be greater than 'Log Events Every':",
 			required: false,
@@ -360,19 +360,19 @@ private getOptionsPageContent() {
 		}
 	}
 	section("${getWebAppName()}") {		
-		input "googleWebAppUrl", "text",
+		input "loggerAppUrl", "text",
 			title: "${getWebAppName()} Url",
-			defaultValue: ${loggerUrlDev},
+			defaultValue: "${loggerUrlDev()}",
 			required: true
-		paragraph "The url you enter into this field needs to start with: ${loggerUrl} or ${loggerUrlDev}"
+		paragraph "The url you enter into this field needs to start with: ${loggerUrl()} or ${loggerUrlDev()} or ${webAppBaseUrl}"
 		paragraph "If your url does not start like that, go back and copy it from the Script Editor Publish screen in the Google Sheet."		
 	}
 	
-	if (state.installed) {
+/* 	if (state.installed) {
 		section("OAuth Token") {
 			getPageLink("createTokenPageLink", "Generate New OAuth Token", "createTokenPage", null, state.endpoint ? "" : "The SmartApp was unable to generate an OAuth token which usually happens if you haven't gone into the IDE and enabled OAuth in this SmartApps settings.  Once OAuth is enabled, you can click this link to try again.")
 		}
-	}
+	} */
 	
 	section("Live Logging Options") {
 		input "logging", "enum",
@@ -447,7 +447,7 @@ private disposeAppEndpoint() {
 
 def installed() {	
 	logTrace "Executing installed()"
-	initializeAppEndpoint()
+	//initializeAppEndpoint()
 	state.installed = true
 }
 
@@ -458,13 +458,15 @@ def updated() {
 	unschedule()
 	unsubscribe()
 	
-	initializeAppEndpoint()
+	//initializeAppEndpoint()
 	
-	if (settings?.logFrequency && settings?.maxEvents && settings?.logDesc != null && verifyWebAppUrl(loggerUrl)) {
+	logDebug "[updated] freq: ${settings?.logFrequency}, url: ${settings?.loggerAppUrl}"
+	
+	if (settings?.logFrequency && settings?.maxEvents && settings?.logDesc != null && verifyWebAppUrl(settings?.loggerAppUrl)) {
 		state.optionsConfigured = true
 	}
 	else {
-		logDebug "Unconfigured - Options"
+		logDebug "Unconfigured - Options. ${loggerUrlDev()} settings?.loggerAppUrl"
 		state.optionsConfigured = false
 	}
 	
@@ -485,30 +487,30 @@ def updated() {
 	state.allConfigured = (state.optionsConfigured && state.attributesConfigured && state.devicesConfigured)
 	
 	if  (state.allConfigured) {
-		def logFrequency = (settings?.logFrequency ?: "5 Minutes").replace(" ", "")
+		def logFrequency = (settings?.logFrequency ?: "10 Minutes").replace(" ", "")
 		
 		"runEvery${logFrequency}"(logNewEvents)
 		
 		//verifyGSVersion()
 		runIn(10, startLogNewEvents)
-	}
-	else {
+	} else {
 		logDebug "Event Logging is disabled because there are unconfigured settings."
 	}
 }
 
 private verifyWebAppUrl(url) {
+	logDebug "[verifyWebAppUrl] url, name: ${getWebAppName()},  logger: ${loggerUrlDev()} "
 	if (!url) {
 		logDebug "The ${getWebAppName()} Url field is required"
 		return false
 	}
-	else if ("$url"?.toLowerCase()?.startsWith(loggerUrl) || "$url"?.toLowerCase()?.startsWith(loggerUrlDev)) {
+	return true
+/* 	} else if ("$url"?.toLowerCase()?.startsWith(loggerUrl) || "$url"?.toLowerCase()?.startsWith(loggerUrlDev)) {
 		return true
-	}
-	else {		
+	} else {		
 		logWarn "The ${webAppName} Url is not valid"
 		return false
-	}
+	} */
 }
 
 // Requests the version from the Google Script and displays a warning if it's not the expected version.
@@ -518,7 +520,7 @@ private verifyGSVersion() {
 	logTrace "Retrieving Google Script Code version of the ${getWebAppName()}"
 	try {
 		def params = [
-			uri: settings?.googleWebAppUrl
+			uri: settings?.loggerAppUrl
 		]
 	
 		httpGet(params) { objResponse ->
@@ -636,11 +638,13 @@ private postEventsToGoogleSheets(events) {
 	])
 
 	def params = [
-		uri: "${settings?.googleWebAppUrl}",
+		//uri: "${settings?.googleWebAppUrl}",
+		uri: "${settings?.loggerAppUrl}",
 		contentType: "application/json",
 		body: jsonData
 	]	
 	
+	logDebug("[postEventsToGoogleSheets] ${jsonData} ${params}")
 	asynchttp_v1.post(processLogEventsResponse, params)
 }
 
@@ -1013,7 +1017,8 @@ private loggerUrlDev() {
 }
 
 private getWebAppBaseUrl() {
-	return "https://script.google.com/macros/s/"
+	return "https://www.hundredgraphs.com/hook/"
+	//return "https://script.google.com/macros/s/"
 }
 
 private getWebAppBaseUrl2() {
