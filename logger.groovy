@@ -317,6 +317,10 @@ private getOptionsPageContent() {
 			title: "API key:",
 			defaultValue: "None",
 			required: true
+		input "node", "text",
+			title: "Node (should be unique for each hub):",
+			defaultValue: "1",
+			required: true
 		input "logFrequency", "enum",
 			title: "Log Events Every:",
 			required: false,
@@ -640,6 +644,8 @@ private postEventsToLogger(events) {
 	def jsonOutput = new groovy.json.JsonOutput()
 	def jsonData = jsonOutput.toJson([
 		apiKey: settings?.apiKey,
+		app: state.app,
+		version: "${version()}",
 		postBackUrl: "${state.endpoint}logger",
 		archiveOptions: getArchiveOptions(),
 		logDesc: (settings?.logDesc != false),
