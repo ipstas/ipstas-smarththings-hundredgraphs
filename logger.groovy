@@ -644,6 +644,7 @@ private postEventsToLogger(events) {
 	def jsonOutput = new groovy.json.JsonOutput()
 	def jsonData = jsonOutput.toJson([
 		apiKey: settings?.apiKey,
+		node: settings?.node,
 		app: state.app,
 		version: "${version()}",
 		postBackUrl: "${state.endpoint}logger",
@@ -673,16 +674,17 @@ private getArchiveOptions() {
 	]
 }
 
-// Google Sheets redirects the post to a temporary url so the response is usually 302 which is page moved.
 def processLogEventsResponse(response, data) {
-	if (response?.status == 302) {
+	if (response?.status == 200) {
+		logTrace "${getWebAppName()} Response: ${response.status}, ${response.data}, ${response.json}, full: ${response}, data: ${data}"
+		state.loggingStatus.success = true
+		state.loggingStatus.finished = new Date().time
+	} else if (response?.status == 302) {
 		logTrace "${getWebAppName()} Response: ${response.status}"
-	}
-	else if ( response?.errorMessage?.contains("Read timeout to script.google.com") ) {
-		logTrace "Timeout while waiting for Google Logging to complete."
-	}
-	else {
-		logWarn "Unexpected response from ${getWebAppName()}: ${response?.errorMessage}"
+	}	else if (response?.status == 501) {
+		logTrace "Timeout while waiting for HundredGraphs"
+	}	else {
+		logWarn "Unexpected response from ${getWebAppName()}: ${response.status}, ${response?.errorMessage}"
 	}
 }
 
@@ -717,6 +719,9 @@ mappings {
 def api_updateLoggingStatus() {
 	def status = state.loggingStatus ?: [:]
 	def data = request.JSON
+	
+	logDebug "${getWebAppName()} status: ${request.JSON}"
+	
 	if (data) {
 		status.success = data.success
 		status.eventsArchived = data.eventsArchived
@@ -775,21 +780,21 @@ private getFormattedLoggingStatus() {
 private getNewEvents(startDate, endDate) {	
 	def events = []
 	
-	logTrace "Retrieving Events from ${startDate} to ${endDate}"
-	
 	getSelectedDevices()?.each  { device ->
 		getDeviceAllowedAttrs(device?.displayName)?.each { attr ->
+			//logTrace "checking device: ${device?.displayName} ${attr}"
 			device.statesBetween("${attr}", startDate, endDate, [max: maxEventsSetting])?.each { event ->
 				events << [
 					time: getFormattedLocalTime(event.date?.time),
 					device: device.displayName,
-					name: "${attr}",
+					type: "${attr}",
 					value: event.value,
 					desc: getEventDesc(event)
 				]
 			}
 		}
 	}
+	logTrace "Retrieving Events from ${startDate} to ${endDate} count: ${events?.size} ${events}"
 	return events?.unique()?.sort { it.time }
 }
 
