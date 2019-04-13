@@ -104,9 +104,9 @@ definition(
     author: "HundredGraphs",
     description: "Allows you to choose devices and attributes and it logs the device, event name, event value, event time, and event description of all the events that have occured since the last time it ran.",
     category: "My Apps",
-    iconUrl: "https://res.cloudinary.com/orangry/image/upload/v1554557246/hundredgraphs/HundredGraphs_620x620.png",
-    iconX2Url: "https://res.cloudinary.com/orangry/image/upload/v1554557246/hundredgraphs/HundredGraphs_620x620.png",
-    iconX3Url: "https://res.cloudinary.com/orangry/image/upload/v1554557246/hundredgraphs/HundredGraphs_620x620.png")
+    iconUrl: "https://res.cloudinary.com/orangry/image/upload/c_scale,w_30/v1554557246/hundredgraphs/HundredGraphs_620x620.png",
+    iconX2Url: "https://res.cloudinary.com/orangry/image/upload/c_scale,w_60/v1554557246/hundredgraphs/HundredGraphs_620x620.png",
+    iconX3Url: "https://res.cloudinary.com/orangry/image/upload/c_scale,w_100/v1554557246/hundredgraphs/HundredGraphs_620x620.png")
 		
 preferences {
 	page(name: "mainPage")
