@@ -118,7 +118,7 @@ preferences {
 	//page(name: "createTokenPage")
 }
 
-def version() { return "00.00.01" }
+def version() { return "00.00.02" }
 def gsVersion() { return "00.00.01" }
 
 def mainPage() {
@@ -370,7 +370,7 @@ private getOptionsPageContent() {
 	section("${getWebAppName()}") {		
 		input "loggerAppUrl", "text",
 			title: "${getWebAppName()} Url",
-			defaultValue: "${loggerUrlDev()}",
+			defaultValue: "${loggerUrl()}",
 			required: true
 		paragraph "The url you enter into this field needs to start with: ${loggerUrl()} or ${loggerUrlDev()} or ${webAppBaseUrl}"
 		paragraph "If your url does not start like that, go back and copy it from the Script Editor Publish screen in the Google Sheet."		
