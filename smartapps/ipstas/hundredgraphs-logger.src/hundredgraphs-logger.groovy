@@ -104,9 +104,9 @@ definition(
     author: "HundredGraphs",
     description: "Allows you to choose devices and attributes and it logs the device, event name, event value, event time, and event description of all the events that have occured since the last time it ran.",
     category: "My Apps",
-    iconUrl: "https://res.cloudinary.com/orangry/image/upload/v1554557246/hundredgraphs/HundredGraphs_620x620.png",
-    iconX2Url: "https://res.cloudinary.com/orangry/image/upload/v1554557246/hundredgraphs/HundredGraphs_620x620.png",
-    iconX3Url: "https://res.cloudinary.com/orangry/image/upload/v1554557246/hundredgraphs/HundredGraphs_620x620.png")
+    iconUrl: "https://res.cloudinary.com/orangry/image/upload/c_scale,w_30/v1554557246/hundredgraphs/HundredGraphs_620x620.png",
+    iconX2Url: "https://res.cloudinary.com/orangry/image/upload/c_scale,w_60/v1554557246/hundredgraphs/HundredGraphs_620x620.png",
+    iconX3Url: "https://res.cloudinary.com/orangry/image/upload/c_scale,w_100/v1554557246/hundredgraphs/HundredGraphs_620x620.png")
 		
 preferences {
 	page(name: "mainPage")
@@ -118,7 +118,7 @@ preferences {
 	//page(name: "createTokenPage")
 }
 
-def version() { return "00.00.01" }
+def version() { return "00.00.02" }
 def gsVersion() { return "00.00.01" }
 
 def mainPage() {
@@ -370,10 +370,10 @@ private getOptionsPageContent() {
 	section("${getWebAppName()}") {		
 		input "loggerAppUrl", "text",
 			title: "${getWebAppName()} Url",
-			defaultValue: "${loggerUrlDev()}",
+			defaultValue: "${loggerUrl()}",
+			options: ["${loggerUrl()}", "${loggerUrlDev()}"]
 			required: true
-		paragraph "The url you enter into this field needs to start with: ${loggerUrl()} or ${loggerUrlDev()} or ${webAppBaseUrl}"
-		paragraph "If your url does not start like that, go back and copy it from the Script Editor Publish screen in the Google Sheet."		
+		paragraph "The url you enter into this field needs to start with: ${loggerUrl()}"	
 	}
 	
 /* 	if (state.installed) {
@@ -782,7 +782,7 @@ private getNewEvents(startDate, endDate) {
 	
 	getSelectedDevices()?.each  { device ->
 		getDeviceAllowedAttrs(device?.displayName)?.each { attr ->
-			logDebug "checking device: ${device?.displayName} ${attr}"
+			//logTrace "checking device: ${device?.displayName} ${attr}"
 			device.statesBetween("${attr}", startDate, endDate, [max: maxEventsSetting])?.each { event ->
 				events << [
 					time: getFormattedLocalTime(event.date?.time),
