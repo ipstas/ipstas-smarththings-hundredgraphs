@@ -372,7 +372,7 @@ private getOptionsPageContent() {
 			title: "${getWebAppName()} Url",
 			defaultValue: "${loggerUrl()}",
 			required: true
-		paragraph "The url you enter into this field needs to start with: ${loggerUrl()} or ${loggerUrlDev()} or ${webAppBaseUrl}"
+		paragraph "The url you enter into this field needs to start with: ${loggerUrl()}"
 		paragraph "If your url does not start like that, go back and copy it from the Script Editor Publish screen in the Google Sheet."		
 	}
 	
