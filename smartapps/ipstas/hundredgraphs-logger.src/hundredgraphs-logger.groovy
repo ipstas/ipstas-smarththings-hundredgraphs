@@ -118,7 +118,7 @@ preferences {
 	//page(name: "createTokenPage")
 }
 
-def version() { return "00.00.02" }
+def version() { return "00.00.03" }
 def gsVersion() { return "00.00.01" }
 
 def mainPage() {
@@ -173,7 +173,9 @@ private getLoggingStatusContent() {
 			def status = getFormattedLoggingStatus()
 			
 			paragraph required: false,
-				"Total Events Logged: ${status.totalEventsLogged}\nAvailable Log Space: ${status.freeSpace}\nLast Execution:\n - Result: ${status.result}\n - Events From: ${status.start}\n - Events To: ${status.end}\n - Logged: ${status.eventsLogged}\n - Run Time: ${status.runTime}"
+				"Version: ${version()}"			
+			paragraph required: false,
+				"Total Events Logged: ${status.totalEventsLogged}\nLast Execution:\n - Result: ${status.result}\n - Events From: ${status.start}\n - Events To: ${status.end}\n - Logged: ${status.eventsLogged}\n - Run Time: ${status.runTime}"
 		}
 	}
 }
@@ -662,7 +664,7 @@ private postEventsToLogger(events) {
 		body: jsonData
 	]	
 	
-	logDebug("[postEventsToLogger] ${jsonData} ${params}")
+	logTrace("[postEventsToLogger] params: ${params}")
 	asynchttp_v1.post(processLogEventsResponse, params)
 }
 
@@ -676,16 +678,18 @@ private getArchiveOptions() {
 
 def processLogEventsResponse(response, data) {
 	if (response?.status == 200) {
-		logTrace "${getWebAppName()} Response: ${response.status}, ${response.data}, ${response.json}, full: ${response}, data: ${data}"
+		logTrace "${getWebAppName()} response.status: ${response.status}, response.data: ${response.data}, response.json: ${response.json}, \nfull: ${response}, \ndata: ${data}"
 		state.loggingStatus.success = true
 		state.loggingStatus.finished = new Date().time
 	} else if (response?.status == 302) {
-		logTrace "${getWebAppName()} Response: ${response.status}"
+		logWarn "${getWebAppName()} Response: ${response.status}"
 	}	else if (response?.status == 501) {
-		logTrace "Timeout while waiting for HundredGraphs"
+		logWarn "Timeout while waiting for HundredGraphs"
 	}	else {
 		logWarn "Unexpected response from ${getWebAppName()}: ${response.status}, ${response?.errorMessage}"
 	}
+	logTrace "${getWebAppName()} response.status: ${response.status}, response.data: ${response.data}, response.json: ${response.json}, \nfull: ${response}, \ndata: ${data}"
+	updateLoggingStatus(state, response)
 }
 
 private initializeAppEndpoint() {		
@@ -716,21 +720,21 @@ mappings {
 	}	
 }
 
-def api_updateLoggingStatus() {
+def updateLoggingStatus(state, response) {
 	def status = state.loggingStatus ?: [:]
-	def data = request.JSON
+	def data = response.json
 	
-	logDebug "${getWebAppName()} status: ${request.JSON}"
+	logTrace "${getWebAppName()} status: ${response.json}"
 	
 	if (data) {
-		status.success = data.success
-		status.eventsArchived = data.eventsArchived
-		status.logIsFull = data.logIsFull
-		status.gsVersion = data.version
+		status.success = data.res
+		//status.eventsArchived = data.eventsArchived
+		//status.logIsFull = data.logIsFull
+		//status.gsVersion = data.version
 		status.finished = new Date().time
-		status.eventsLogged = data.eventsLogged
-		status.totalEventsLogged = data.totalEventsLogged
-		status.freeSpace = data.freeSpace
+		status.eventsLogged = data.monitors
+		//status.totalEventsLogged = data.totalEventsLogged
+		//status.freeSpace = data.freeSpace
 		
 		if (data.error) {
 			logDebug "${getWebAppName()} Reported: ${data.error}"
@@ -741,13 +745,14 @@ def api_updateLoggingStatus() {
 		logDebug "The ${getWebAppName()} postback has no data."
 	}	
 	state.loggingStatus = status
+	logTrace "[updateLoggingStatus] state: ${state}, status: ${status}"
 	logLoggingStatus()
 }
 
 private logLoggingStatus() {
 	def status = getFormattedLoggingStatus()
 	if (status.logIsFull) {
-		logWarn "The Google Sheet is Out of Space"
+		logWarn "HG is Out of Space"
 	}
 	if (state.loggingStatus?.success) {
 		if (status.eventsArchived) {
@@ -761,7 +766,8 @@ private logLoggingStatus() {
 		logWarn "${getWebAppName()} failed to log events between ${status.start} and ${status.end}."
 	}	
 	
-	logTrace "Google Script Version: ${state.loggingStatus?.gsVersion}, Total Events Logged: ${status.totalEventsLogged}, Remaining Space Available: ${status.freeSpace}"
+	//logTrace "HG hookVersion: ${state.loggingStatus?.hookVersion}, Total Events Logged: ${status.totalEventsLogged}, Used Space: ${status.usedSpace} records"
+	//logTrace "HG hookVersion: ${state.loggingStatus?.hookVersion}, Used Space: ${status.usedSpace} records"
 }
 
 private getFormattedLoggingStatus() {
@@ -772,8 +778,8 @@ private getFormattedLoggingStatus() {
 		end:  getFormattedLocalTime(safeToLong(status.lastEventTime)),
 		runTime: "${((safeToLong(status.finished) - safeToLong(status.started)) / 1000)} seconds",
 		eventsLogged: "${String.format('%,d', safeToLong(status.eventsLogged))}",
-		totalEventsLogged: "${String.format('%,d', safeToLong(status.totalEventsLogged))}",
-		freeSpace: status.freeSpace
+		totalEventsLogged: "${String.format('%,d', safeToLong(status.totalEventsLogged))}"
+		//usedSpace: status.usedSpace
 	]
 }
 
@@ -785,7 +791,7 @@ private getNewEvents(startDate, endDate) {
 			//logTrace "checking device: ${device?.displayName} ${attr}"
 			device.statesBetween("${attr}", startDate, endDate, [max: maxEventsSetting])?.each { event ->
 				events << [
-					time: getFormattedLocalTime(event.date?.time),
+					time: event.date?.time,
 					device: device.displayName,
 					type: "${attr}",
 					value: event.value,
@@ -829,6 +835,23 @@ private getFormattedLocalTime(utcTime) {
 		try {
 			def localTZ = TimeZone.getTimeZone(location.timeZone.ID)
 			def localDate = new Date(utcTime + localTZ.getOffset(utcTime))	
+			return localDate.format("MM/dd/yyyy HH:mm:ss")
+		}
+		catch (e) {
+			logWarn "Unable to get formatted local time for ${utcTime}: ${e.message}"
+			return "${utcTime}"
+		}
+	}
+	else {
+		return ""
+	}
+}
+
+private getFormattedUTCTime(utcTime) {
+	if (utcTime) {
+		try {
+			def localTZ = TimeZone.getTimeZone(location.timeZone.ID)
+			def localDate = new Date(utcTime)	
 			return localDate.format("MM/dd/yyyy HH:mm:ss")
 		}
 		catch (e) {
