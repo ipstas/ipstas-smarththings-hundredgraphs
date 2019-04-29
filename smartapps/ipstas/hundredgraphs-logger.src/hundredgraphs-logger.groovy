@@ -118,7 +118,7 @@ preferences {
 	//page(name: "createTokenPage")
 }
 
-def version() { return "00.00.04" }
+def version() { return "00.00.04	" }
 def gsVersion() { return "00.00.01" }
 
 def mainPage() {
@@ -678,11 +678,13 @@ private getArchiveOptions() {
 
 def processLogEventsResponse(response, data) {
 	if (response?.status == 200) {
-		logTrace "${getWebAppName()} response.status: ${response.status}, response.data: ${response.data}, response.json: ${response.json}, \nfull: ${response}, \ndata: ${data}"
+		logTrace "${getWebAppName()} response.status: ${response.status}, response.data: ${response.data}"
 		state.loggingStatus.success = true
 		state.loggingStatus.finished = new Date().time
+	} else if (response?.status == 301) {
+		logWarn "${getWebAppName()} Response: ${response.status}, check your URL settings"
 	} else if (response?.status == 302) {
-		logWarn "${getWebAppName()} Response: ${response.status}"
+		logWarn "${getWebAppName()} Response: ${response.status}, check your URL settings"
 	}	else if (response?.status == 501) {
 		logWarn "Timeout while waiting for HundredGraphs"
 	}	else {
