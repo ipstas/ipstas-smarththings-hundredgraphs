@@ -515,7 +515,7 @@ def updated() {
 }
 
 private verifyWebAppUrl(url) {
-	logDebug "[verifyWebAppUrl] url, name: ${getWebAppName()},  logger: {settings?.loggerAppUrl} "
+	logDebug "[verifyWebAppUrl] url, name: ${getWebAppName()},  logger: ${settings?.loggerAppUrl} "
 	if (!url) {
 		logDebug "The ${getWebAppName()} Url field is required"
 		return false
