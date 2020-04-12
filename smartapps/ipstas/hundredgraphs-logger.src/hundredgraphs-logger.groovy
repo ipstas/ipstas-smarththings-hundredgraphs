@@ -37,47 +37,6 @@
  *  URL to documentation:
  *    https://github.com/krlaframboise/SmartThings/tree/master/smartapps/krlaframboise/simple-event-logger.src#simple-event-logger
  *
- *  Changelog:
- *
- *    1.4.1 (10/22/2017)
- *      -  The Google Script does NOT need to be updated.
- *      -  Added "Activity" attribute which will log device "online/offline" changes.
- *      -  Added setting that allows you to log the event descriptionText to the description field instead of just the value and unit.
- *      -  Fixed timeout issue with the Device Attribute Exclusions screen.
- *
- *    1.3 (02/26/2017)
- *      - Requires Google Script Update
- *      - Added maximum catch-up setting that restricts the date range it uses when catching up from missed runs.
- *      - Added option for Log Reporting so when it's enabled it creates a column for hour and short date. 
- *
- *    1.2.1 (01/28/2017)
- *      - New version of Google Script.
- *
- *    1.2 (01/22/2017)
- *      - Added archive functionality for when the sheet is full or by specific number of events.
- *
- *    1.1.3 (01/19/2017)
- *      - Retrieve events from state instead of event history.
- *      - Retrieves up to 200 events per attribute for each device instead of a total of 50 events per device.
- *      - Changed first run to previous hour instead of previous 24 hours to prevent warnings caused by the large number of events that get logged.
- *
- *    1.1.1 (01/04/2017)
- *      - Enabled submit on change for device lists so that the event list populates on initial install. 
- *
- *    1.1.0 (01/02/2017)
- *      - Moved Event Exclusions to another page to prevent timeout and added abort feature so that it stops adding exclusion fields if it runs out of time.
- *      - Fixed log space calculation and added setting to the options section that when enabled, deletes extra columns in the spreadsheet which allows you to log more.
- *
- *    1.0.3 (01/01/2017)
- *      - Disabled submit on change behavior for device selection page and made the select events field display all events instead of just the supported ones.
- *      - Added additional error handling and logging in case the other change doesn't fix the reported error.
- *
- *    1.0.2 (12/29/2016)
- *      - Added additional logging and verification of the Web App Url.
- *
- *    1.0.1 (12/28/2016)
- *      - Bug fix for devices with null attributes
- *
  *    1.0.0 (12/26/2016)
  *      - Initial Release
  *
@@ -118,7 +77,7 @@ preferences {
 	//page(name: "createTokenPage")
 }
 
-def version() { return "00.00.04	" }
+def version() { return "00.00.07" }
 def gsVersion() { return "00.00.01" }
 
 def mainPage() {
@@ -155,6 +114,10 @@ def mainPage() {
 			if (state.optionsConfigured) {
 				getPageLink("optionsPageLink", "Other Options", "optionsPage", null, "Tap to set")
 			}
+			// input "appName", "text",
+				// title: "Assign an app name",
+				// defaultValue: "HundredGraphs Logger",
+				// required: false
 			label title: "Assign a name", required: false
 			mode title: "Set for specific mode(s)", required: false
 			if (state.installed) {		
@@ -298,7 +261,7 @@ def attributeExclusionsPage() {
 							}
 						}
 						catch (e) {
-							logWarn "Error while getting device exclusion list for attribute ${attr}: ${e.message}"
+							logWarn "${app.label} Error while getting device exclusion list for attribute ${attr}: ${e.message}"
 						}
 					}
 				}
@@ -449,20 +412,20 @@ private disposeAppEndpoint() {
 			revokeAccessToken()
 		}
 		catch (e) {
-			logWarn "Unable to remove access token: $e"
+			logWarn "${app.label} Unable to remove access token: $e"
 		}
 		state.endpoint = ""
 	}
 }
 
 def installed() {	
-	logTrace "Executing installed()"
+	logTrace "${app.label} Executing installed()"
 	//initializeAppEndpoint()
 	state.installed = true
 }
 
 def updated() {
-	logTrace "Executing updated()"
+	logTrace "${app.label} Executing updated()"
 	state.installed = true
 	
 	unschedule()
@@ -470,7 +433,7 @@ def updated() {
 	
 	//initializeAppEndpoint()
 	
-	logDebug "[updated] freq: ${settings?.logFrequency}, url: ${settings?.loggerAppUrl}"
+	logDebug "${app.label} [updated] freq: ${settings?.logFrequency}, url: ${settings?.loggerAppUrl}"
 	
 	state.app = "SmartThings"
 	//state.version = ${version()}
@@ -478,26 +441,26 @@ def updated() {
 	if (settings?.apiKey) {
 		state.apiKey = settings?.apiKey
 	}	else {
-		logDebug "Unconfigured - you need API key ${settings?.apiKey}"
+		logDebug "${app.label} Unconfigured - you need API key ${settings?.apiKey}"
 	}
 
 	if (settings?.apiKey && settings?.logFrequency && settings?.maxEvents && settings?.logDesc != null && verifyWebAppUrl(settings?.loggerAppUrl)) {
 		state.optionsConfigured = true
 	}	else {
-		logDebug "Unconfigured - Options. ${loggerUrlDev()} settings?.loggerAppUrl"
+		logDebug "${app.label} Unconfigured - Options. ${loggerUrlDev()} settings?.loggerAppUrl"
 		state.optionsConfigured = false
 	}
 	
 	if (settings?.allowedAttributes) {
 		state.attributesConfigured = true
 	}	else {
-		logDebug "Unconfigured - Choose Events"
+		logDebug "${app.label} Unconfigured - Choose Events"
 	}
 	
 	if (getSelectedDevices()) {
 		state.devicesConfigured = true
 	}	else {
-		logDebug "Unconfigured - Choose Devices"
+		logDebug "${app.label} Unconfigured - Choose Devices"
 	}
 	
 	state.allConfigured = (state.apiKey && state.optionsConfigured && state.attributesConfigured && state.devicesConfigured)
@@ -510,14 +473,14 @@ def updated() {
 		//verifyGSVersion()
 		runIn(10, startLogNewEvents)
 	} else {
-		logWarn "Event Logging is disabled because there are unconfigured settings. ${settings?.loggerAppUrl}, ${settings?.apiKey}"
+		logWarn "${app.label} Event Logging is disabled because there are unconfigured settings. ${settings?.loggerAppUrl}, ${settings?.apiKey}"
 	}
 }
 
 private verifyWebAppUrl(url) {
-	logDebug "[verifyWebAppUrl] url, name: ${getWebAppName()},  logger: ${settings?.loggerAppUrl} "
+	logDebug "${app.label} [verifyWebAppUrl] url, name: ${getWebAppName()},  logger: ${settings?.loggerAppUrl} "
 	if (!url) {
-		logDebug "The ${getWebAppName()} Url field is required"
+		logDebug "${app.label} The ${getWebAppName()} Url field is required"
 		return false
 	}
 	return true
@@ -533,7 +496,7 @@ private verifyWebAppUrl(url) {
 private verifyGSVersion() {
 	def actualGSVersion = ""
 	
-	logTrace "Retrieving Google Script Code version of the ${getWebAppName()}"
+	logTrace "${app.label} Retrieving Google Script Code version of the ${getWebAppName()}"
 	try {
 		def params = [
 			uri: settings?.loggerAppUrl
@@ -589,7 +552,7 @@ def logNewEvents() {
 	def eventCount = events?.size ?: 0
 	def actionMsg = eventCount > 0 ? ", posting them to ${getWebAppName()}" : ""
 	
-	logDebug "SmartThings found ${String.format('%,d', eventCount)} events between ${getFormattedLocalTime(startDate.time)} and ${getFormattedLocalTime(endDate.time)}${actionMsg}"
+	logDebug "${app.label} SmartThings found ${String.format('%,d', eventCount)} events between ${getFormattedLocalTime(startDate.time)} and ${getFormattedLocalTime(endDate.time)}${actionMsg}"
 	
 	if (events) {
 		postEventsToLogger(events)
@@ -636,19 +599,42 @@ private getLogCatchUpFrequencySettingMS() {
 		case "6 Hours":
 			minutesVal = 360
 			break
+		case "24 Hours":
+			minutesVal = 1440
+			break
 		default:
 			minutesVal = 60
 	}
 	return (minutesVal * 60 * 1000)
 }
 
+def hubInfo(){
+    def hub = location.hubs[0]
+
+    logWarn "${app.label} id: ${hub.id}"
+    logWarn "${app.label} zigbeeId: ${hub.zigbeeId}"
+    logWarn "${app.label} zigbeeEui: ${hub.zigbeeEui}"
+
+    // PHYSICAL or VIRTUAL
+    logWarn "${app.label} type: ${hub.type}"
+
+    logWarn "${app.label} name: ${hub.name}"
+    logWarn "${app.label} firmwareVersionString: ${hub.firmwareVersionString}"
+    logWarn "${app.label} localIP: ${hub.localIP}"
+    logWarn "${app.label} localSrvPortTCP: ${hub.localSrvPortTCP}"
+	logWarn "${app.label} Executing installed()"
+    return hub
+}
+
 private postEventsToLogger(events) {
+	def hub = location.hubs[0]
 	def jsonOutput = new groovy.json.JsonOutput()
 	def jsonData = jsonOutput.toJson([
 		apiKey: settings?.apiKey,
 		node: settings?.node,
 		app: state.app,
 		version: "${version()}",
+        hubId: "${hub.id}",
 		postBackUrl: "${state.endpoint}logger",
 		archiveOptions: getArchiveOptions(),
 		logDesc: (settings?.logDesc != false),
@@ -678,26 +664,26 @@ private getArchiveOptions() {
 
 def processLogEventsResponse(response, data) {
 	if (response?.status == 200) {
-		logTrace "${getWebAppName()} response.status: ${response.status}, response.data: ${response.data}"
+		//logTrace "${app.label} ${getWebAppName()} response.status: ${response.status}, response.data: ${response.data}"
 		state.loggingStatus.success = true
 		state.loggingStatus.finished = new Date().time
 	} else if (response?.status == 301) {
-		logWarn "${getWebAppName()} Response: ${response.status}, check your URL settings"
+		logWarn "${app.label} ${getWebAppName()} Response: ${response.status}, check your URL settings"
 	} else if (response?.status == 302) {
-		logWarn "${getWebAppName()} Response: ${response.status}, check your URL settings"
+		logWarn "${app.label} ${getWebAppName()} Response: ${response.status}, check your URL settings"
 	}	else if (response?.status == 501) {
-		logWarn "Timeout while waiting for HundredGraphs"
+		logWarn "${app.label} Timeout while waiting for HundredGraphs"
 	}	else {
-		logWarn "Unexpected response from ${getWebAppName()}: ${response.status}, ${response?.errorMessage}"
+		logWarn "${app.label} Unexpected response from ${getWebAppName()}: ${response.status}, ${response?.errorMessage}"
 	}
-	logTrace "${getWebAppName()} response.status: ${response.status}, response.data: ${response.data}, response.json: ${response.json}, \nfull: ${response}, \ndata: ${data}"
+	logTrace "${app.label} ${getWebAppName()} response.status: ${response.status}, response.data: ${response.data}"
 	updateLoggingStatus(state, response)
 }
 
 private initializeAppEndpoint() {		
 	try {
 		if (!state.endpoint) {
-			logDebug "Creating Access Token"
+			logDebug "${app.label} Creating Access Token"
 			def accessToken = createAccessToken()
 			if (accessToken) {
 				state.endpoint = apiServerUrl("/api/token/${accessToken}/smartapps/installations/${app.id}/")
@@ -726,7 +712,7 @@ def updateLoggingStatus(state, response) {
 	def status = state.loggingStatus ?: [:]
 	def data = response.json
 	
-	logTrace "${getWebAppName()} status: ${response.json}"
+	//logTrace "${app.label} ${getWebAppName()} status: ${response.json}"
 	
 	if (data) {
 		status.success = data.res
@@ -739,33 +725,33 @@ def updateLoggingStatus(state, response) {
 		//status.freeSpace = data.freeSpace
 		
 		if (data.error) {
-			logDebug "${getWebAppName()} Reported: ${data.error}"
+			logDebug "${app.label} ${getWebAppName()} Reported: ${data.error}"
 		}
 	}
 	else {
 		status.success = false
-		logDebug "The ${getWebAppName()} postback has no data."
+		logDebug "${app.label} The ${getWebAppName()} postback has no data."
 	}	
 	state.loggingStatus = status
-	logTrace "[updateLoggingStatus] state: ${state}, status: ${status}"
+	logTrace "${app.label} [updateLoggingStatus] state: ${state}, status: ${status}"
 	logLoggingStatus()
 }
 
 private logLoggingStatus() {
 	def status = getFormattedLoggingStatus()
 	if (status.logIsFull) {
-		logWarn "HG is Out of Space"
+		logWarn "${app.label} HG is Out of Space"
 	}
 	if (state.loggingStatus?.success) {
 		if (status.eventsArchived) {
-			logDebug "${getWebAppName()} archived events in ${status.runTime}."
+			logDebug "${app.label} ${getWebAppName()} archived events in ${status.runTime}."
 		}
 		else {
-			logDebug "${getWebAppName()} logged ${status.eventsLogged} events between ${status.start} and ${status.end} in ${status.runTime}."			
+			logDebug "${app.label} ${getWebAppName()} logged ${status.eventsLogged} events between ${status.start} and ${status.end} in ${status.runTime}."			
 		}		
 	}
 	else {
-		logWarn "${getWebAppName()} failed to log events between ${status.start} and ${status.end}."
+		logWarn "${app.label} ${getWebAppName()} failed to log events between ${status.start} and ${status.end}."
 	}	
 	
 	//logTrace "HG hookVersion: ${state.loggingStatus?.hookVersion}, Total Events Logged: ${status.totalEventsLogged}, Used Space: ${status.usedSpace} records"
@@ -794,6 +780,7 @@ private getNewEvents(startDate, endDate) {
 			device.statesBetween("${attr}", startDate, endDate, [max: maxEventsSetting])?.each { event ->
 				events << [
 					time: event.date?.time,
+					id: event.deviceId,
 					device: device.displayName,
 					type: "${attr}",
 					value: event.value,
@@ -802,7 +789,7 @@ private getNewEvents(startDate, endDate) {
 			}
 		}
 	}
-	logTrace "Retrieving Events from ${startDate} to ${endDate} count: ${events?.size} ${events}"
+	logTrace "${app.label} Retrieving Events from ${startDate} to ${endDate} count: ${events?.size} - ${events}"
 	return events?.unique()?.sort { it.time }
 }
 
@@ -840,7 +827,7 @@ private getFormattedLocalTime(utcTime) {
 			return localDate.format("MM/dd/yyyy HH:mm:ss")
 		}
 		catch (e) {
-			logWarn "Unable to get formatted local time for ${utcTime}: ${e.message}"
+			logWarn "${app.label} Unable to get formatted local time for ${utcTime}: ${e.message}"
 			return "${utcTime}"
 		}
 	}
@@ -857,7 +844,7 @@ private getFormattedUTCTime(utcTime) {
 			return localDate.format("MM/dd/yyyy HH:mm:ss")
 		}
 		catch (e) {
-			logWarn "Unable to get formatted local time for ${utcTime}: ${e.message}"
+			logWarn "${app.label} Unable to get formatted local time for ${utcTime}: ${e.message}"
 			return "${utcTime}"
 		}
 	}
@@ -876,14 +863,15 @@ private getDeviceAllowedAttrs(deviceName) {
 				if (!attrExcludedDevices?.find { it?.toLowerCase() == deviceName?.toLowerCase() }) {
 					deviceAllowedAttrs << "${attr}"
 				}
+				//logTrace "${app.label} [retrieved] ${deviceName} id #${device?.displayName} for attr: ${attr}"
 			}
 			catch (e) {
-				logWarn "Error while getting device allowed attributes for ${device?.displayName} and attribute ${attr}: ${e.message}"
+				logWarn "${app.label} Error while getting device allowed attributes for ${device?.displayName} and attribute ${attr}: ${e.message}"
 			}
 		}
 	}
 	catch (e) {
-		logWarn "Error while getting device allowed attributes for ${device.displayName}: ${e.message}"
+		logWarn "${app.label} Error while getting device allowed attributes for ${device.displayName}: ${e.message}"
 	}
 	return deviceAllowedAttrs
 }
@@ -901,7 +889,7 @@ private getSupportedAttributes() {
 				}
 			}
 			catch (e) {
-				logWarn "Error while finding supported devices for ${attr}: ${e.message}"
+				logWarn "${app.label} Error while finding supported devices for ${attr}: ${e.message}"
 			}
 			
 		}
