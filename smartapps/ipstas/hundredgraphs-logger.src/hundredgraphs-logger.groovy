@@ -77,7 +77,7 @@ preferences {
 	//page(name: "createTokenPage")
 }
 
-def version() { return "00.00.07" }
+def version() { return "00.00.08" }
 def gsVersion() { return "00.00.01" }
 
 def mainPage() {
@@ -635,11 +635,12 @@ private postEventsToLogger(events) {
 		app: state.app,
 		version: "${version()}",
         hubId: "${hub.id}",
-		postBackUrl: "${state.endpoint}logger",
-		archiveOptions: getArchiveOptions(),
-		logDesc: (settings?.logDesc != false),
+        frequency: settings?.node,
+		//postBackUrl: "${state.endpoint}logger",
+		//archiveOptions: getArchiveOptions(),
+		//logDesc: (settings?.logDesc != false),
 		logReporting: (settings?.logReporting == true),
-		deleteExtraColumns: (settings?.deleteExtraColumns == true),
+		//deleteExtraColumns: (settings?.deleteExtraColumns == true),
 		events: events
 	])
 
@@ -668,15 +669,17 @@ def processLogEventsResponse(response, data) {
 		state.loggingStatus.success = true
 		state.loggingStatus.finished = new Date().time
 	} else if (response?.status == 301) {
-		logWarn "${app.label} ${getWebAppName()} Response: ${response.status}, check your URL settings"
+		logWarn "${app.label} ${getWebAppName()} Response: ${response.status}, response.data: ${response.data}, ${response?.errorMessage}, check your URL settings"
 	} else if (response?.status == 302) {
-		logWarn "${app.label} ${getWebAppName()} Response: ${response.status}, check your URL settings"
-	}	else if (response?.status == 501) {
+		logWarn "${app.label} ${getWebAppName()} Response: ${response.status}, response.data: ${response.data}, ${response?.errorMessage}, check your URL settings"
+	} else if (response?.status == 402) {
+		logWarn "${app.label} ${getWebAppName()} [processLogEventsResponse] Status: ${response.status}, Err: ${response?.errorMessage}, Response: ${response}, check your frequency reporting"
+	} else if (response?.status == 501) {
 		logWarn "${app.label} Timeout while waiting for HundredGraphs"
-	}	else {
-		logWarn "${app.label} Unexpected response from ${getWebAppName()}: ${response.status}, ${response?.errorMessage}"
+	} else {
+		logWarn "${app.label} Unexpected response from ${getWebAppName()}: ${response.status}, response.data: ${response.data}, ${response?.errorMessage}"
 	}
-	logTrace "${app.label} ${getWebAppName()} response.status: ${response.status}, response.data: ${response.data}"
+	logTrace "${app.label} ${getWebAppName()} response.status: ${response.status}, response.data: ${response.data}, response: ${response}"
 	updateLoggingStatus(state, response)
 }
 
