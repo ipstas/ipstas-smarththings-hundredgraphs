@@ -82,15 +82,16 @@ def gsVersion() { return "00.00.01" }
 
 def mainPage() {
 	dynamicPage(name:"mainPage", uninstall:true, install:true) {
-		if (state.allConfigured && state.loggingStatus) {
+		
+        if (state.allConfigured && state.loggingStatus) {
 			getLoggingStatusContent()
-		}
+		} 
+        
 		if (state.devicesConfigured) {
 			section("Selected Devices") {
 				getPageLink("devicesPageLink", "Tap to change", "devicesPage", null, buildSummary(getSelectedDeviceNames()))
 			}
-		}
-		else {			
+		} else {			
 			getDevicesPageContent()
 		}
 		
@@ -101,8 +102,7 @@ def mainPage() {
 			section ("Event Device Exclusions") {
 				getPageLink("attributeExclusionsPageLink", "Select devices to exclude for specific events.", "attributeExclusionsPage")
 			}
-		}
-		else {
+		} else {
 			getAttributesPageContent()
 		}
 				
@@ -122,8 +122,10 @@ def mainPage() {
 			mode title: "Set for specific mode(s)", required: false
 			if (state.installed) {		
 				getPageLink("aboutPageLink", "About HundredGraphs Logger", "aboutPage", null, "Tap to view documentation, version and additional information.", "https://res.cloudinary.com/orangry/image/upload/v1554557246/hundredgraphs/HundredGraphs_620x620.png")
+                //Feed result: response?.status
 			}
 		}
+        
 		section("  ") {
 			paragraph "  ", required: false
 		}
@@ -131,16 +133,33 @@ def mainPage() {
 }
 
 private getLoggingStatusContent() {
-	if (state.loggingStatus?.success != null) {
+	//logTrace "${app.label} [getLoggingStatusContent] success: ${state.loggingStatus?.success}, state: ${state}"
+	if (state.loggingStatus?.success == null) {
+    	def status = getFormattedLoggingStatus();
+        //state.loggingStatus?.success = false
+    	logDebug "${app.label} [getLoggingStatusContent] success: False, state: ${state}, status: ${status}"
+        section("Logging Status") {		
+        	paragraph required: false,
+				"Version: ${version()}"
+            paragraph required: false,
+				"Success: ${state.loggingStatus?.result}"
+            paragraph required: false,
+				"Events Logged: ${status.eventsLogged} \nLast Execution:\n - HTTP code: ${status.code}\n - Events From: ${status.start}\n - Events To: ${status.end}\n - Run Time: ${status.runTime} \n - ${status.details}"
+            paragraph required: false,
+				"HTTP codes: \n 200 - full or partial success \n 301/302 - check your url \n 402 - you are trying to use paid services \n 408 - you are sending data too often \n 501 - timeout, server is unavailable at the moment"                
+        }
+	} else {
 		section("Logging Status") {			
 			def status = getFormattedLoggingStatus()
 			
 			paragraph required: false,
-				"Version: ${version()}"			
+				"Version: ${version()}"		
+            paragraph required: false,
+				"Success: ${state.loggingStatus?.result}"
 			paragraph required: false,
-				"Total Events Logged: ${status.totalEventsLogged}\nLast Execution:\n - Result: ${status.result}\n - Events From: ${status.start}\n - Events To: ${status.end}\n - Logged: ${status.eventsLogged}\n - Run Time: ${status.runTime}"
+				"Events Logged: ${status.eventsLogged} \nLast Execution:\n - HTTP code: ${status.code}\n - Events From: ${status.start}\n - Events To: ${status.end}\n - Run Time: ${status.runTime} \n - ${status.details}"
 		}
-	}
+    }
 }
 
 def aboutPage() {
@@ -526,6 +545,7 @@ def startLogNewEvents() {
 }
 
 def logNewEvents() {	
+	logWarn " "
 	def status = state.loggingStatus ?: [:]
 	
 	// Move the date range to the next position unless the google script failed last time or was skipped due to the sheet being archived.
@@ -635,7 +655,7 @@ private postEventsToLogger(events) {
 		app: state.app,
 		version: "${version()}",
         hubId: "${hub.id}",
-        frequency: settings?.node,
+        frequency: settings?.logFrequency,
 		//postBackUrl: "${state.endpoint}logger",
 		//archiveOptions: getArchiveOptions(),
 		//logDesc: (settings?.logDesc != false),
@@ -669,17 +689,21 @@ def processLogEventsResponse(response, data) {
 		state.loggingStatus.success = true
 		state.loggingStatus.finished = new Date().time
 	} else if (response?.status == 301) {
-		logWarn "${app.label} ${getWebAppName()} Response: ${response.status}, response.data: ${response.data}, ${response?.errorMessage}, check your URL settings"
+		logTrace "${app.label} ${getWebAppName()} Response: ${response.status}, check your URL settings"
 	} else if (response?.status == 302) {
-		logWarn "${app.label} ${getWebAppName()} Response: ${response.status}, response.data: ${response.data}, ${response?.errorMessage}, check your URL settings"
+		logTrace "${app.label} ${getWebAppName()} Response: ${response.status}, check your URL settings"
 	} else if (response?.status == 402) {
-		logWarn "${app.label} ${getWebAppName()} [processLogEventsResponse] Status: ${response.status}, Err: ${response?.errorMessage}, Response: ${response}, check your frequency reporting"
+		logTrace "${app.label} ${getWebAppName()} [processLogEventsResponse] Response: ${response.status}, ${response.errorJson}"
+        //logWarn "${app.label} ${getWebAppName()} [processLogEventsResponse]2 Response.data: ${response.errorJson}"
+	} else if (response?.status == 408) {
+		logTrace "${app.label} ${getWebAppName()} [processLogEventsResponse] Response: ${response.status}, ${response.errorJson}"
+        //logWarn "${app.label} ${getWebAppName()} [processLogEventsResponse]2 Response.data: ${response.errorJson}"
 	} else if (response?.status == 501) {
-		logWarn "${app.label} Timeout while waiting for HundredGraphs"
+		logTrace "${app.label} Response: ${response.status}. Timeout while waiting for HundredGraphs"
 	} else {
-		logWarn "${app.label} Unexpected response from ${getWebAppName()}: ${response.status}, response.data: ${response.data}, ${response?.errorMessage}"
+		logTrace "${app.label} Unexpected response from ${getWebAppName()}: ${response.status}, response.data: ${response.data}, ${response?.errorMessage}"
 	}
-	logTrace "${app.label} ${getWebAppName()} response.status: ${response.status}, response.data: ${response.data}, response: ${response}"
+	//logTrace "${app.label} ${getWebAppName()} response.status: ${response.status} "
 	updateLoggingStatus(state, response)
 }
 
@@ -713,35 +737,49 @@ mappings {
 
 def updateLoggingStatus(state, response) {
 	def status = state.loggingStatus ?: [:]
-	def data = response.json
+	def data
+    def json
+    try{ 
+		json = response?.json ?: [:]
+        //logTrace "${app.label} ${getWebAppName()} [updateLoggingStatus]0 \njson: ${json}"
+    } catch(e) {
+    	json = response?.errorJson ?: [:]
+        //logTrace "${app.label} ${getWebAppName()} [updateLoggingStatus]0 \nerrJson: ${json}"
+    }
 	
-	//logTrace "${app.label} ${getWebAppName()} status: ${response.json}"
+	//logTrace "${app.label} ${getWebAppName()} [updateLoggingStatus] state: ${state}; status: ${status}; json: ${json}"
 	
-	if (data) {
-		status.success = data.res
+	if (json) {
+    	data = json
+		status.success = data?.res
+        status.code = response?.status
+        status.details = data.details ?: ''
 		//status.eventsArchived = data.eventsArchived
 		//status.logIsFull = data.logIsFull
 		//status.gsVersion = data.version
 		status.finished = new Date().time
-		status.eventsLogged = data.monitors
+		status.eventsLogged = data?.monitors
+        status.eventsSent = data?.monitors
 		//status.totalEventsLogged = data.totalEventsLogged
 		//status.freeSpace = data.freeSpace
 		
 		if (data.error) {
 			logDebug "${app.label} ${getWebAppName()} Reported: ${data.error}"
 		}
-	}
-	else {
+        //logTrace "${app.label} ${getWebAppName()} [updateLoggingStatus] logged: ${status.eventsLogged}; status: ${status}"
+	} else {
 		status.success = false
-		logDebug "${app.label} The ${getWebAppName()} postback has no data."
+		logDebug "${app.label} The ${getWebAppName()} [updateLoggingStatus] postback has no data."
 	}	
 	state.loggingStatus = status
-	logTrace "${app.label} [updateLoggingStatus] state: ${state}, status: ${status}"
+	//logTrace "${app.label} [updateLoggingStatus] status: ${status}"
 	logLoggingStatus()
 }
 
 private logLoggingStatus() {
+	//logTrace "[logLoggingStatus]0 state: ${state}"
 	def status = getFormattedLoggingStatus()
+    logDebug "${app.label} [logLoggingStatus] status: ${status}"
 	if (status.logIsFull) {
 		logWarn "${app.label} HG is Out of Space"
 	}
@@ -750,11 +788,11 @@ private logLoggingStatus() {
 			logDebug "${app.label} ${getWebAppName()} archived events in ${status.runTime}."
 		}
 		else {
-			logDebug "${app.label} ${getWebAppName()} logged ${status.eventsLogged} events between ${status.start} and ${status.end} in ${status.runTime}."			
+			logDebug "${app.label} ${getWebAppName()} logged ${status.eventsLogged} events between ${status.start} and ${status.end} in ${status.runTime}. code: ${status.code}, details: ${status.details}"			
 		}		
 	}
 	else {
-		logWarn "${app.label} ${getWebAppName()} failed to log events between ${status.start} and ${status.end}."
+		logWarn "${app.label} ${getWebAppName()} failed to log events between ${status.start} and ${status.end}. code: ${status.code}, details: ${status.details}"
 	}	
 	
 	//logTrace "HG hookVersion: ${state.loggingStatus?.hookVersion}, Total Events Logged: ${status.totalEventsLogged}, Used Space: ${status.usedSpace} records"
@@ -763,18 +801,22 @@ private logLoggingStatus() {
 
 private getFormattedLoggingStatus() {
 	def status = state.loggingStatus ?: [:]
+    //logTrace "[getFormattedLoggingStatus] status: ${status}"
 	return [
 		result: status?.success ? "Successful" : "Failed",
+        code: status?.code ?: "empty",
 		start:  getFormattedLocalTime(safeToLong(status.firstEventTime)),
 		end:  getFormattedLocalTime(safeToLong(status.lastEventTime)),
 		runTime: "${((safeToLong(status.finished) - safeToLong(status.started)) / 1000)} seconds",
-		eventsLogged: "${String.format('%,d', safeToLong(status.eventsLogged))}",
-		totalEventsLogged: "${String.format('%,d', safeToLong(status.totalEventsLogged))}"
+		eventsLogged: "${String.format('%s', status.eventsLogged)}",
+        details: "${String.format('%s', status.details)}",
+		//totalEventsLogged: "${String.format('%,d', safeToLong(status.totalEventsLogged))}"
 		//usedSpace: status.usedSpace
 	]
 }
 
 private getNewEvents(startDate, endDate) {	
+	
 	def events = []
 	
 	getSelectedDevices()?.each  { device ->
@@ -792,7 +834,8 @@ private getNewEvents(startDate, endDate) {
 			}
 		}
 	}
-	logTrace "${app.label} Retrieving Events from ${startDate} to ${endDate} count: ${events?.size} - ${events}"
+    logDebug " "
+	logTrace "${app.label} [getNewEvents] Retrieving Events from ${startDate} to ${endDate} count: ${events?.size} - ${events}"
 	return events?.unique()?.sort { it.time }
 }
 
