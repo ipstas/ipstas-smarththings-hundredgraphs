@@ -56,7 +56,9 @@
  */
  
 include 'asynchttp_v1'
- 
+import groovy.json.JsonBuilder
+import groovy.json.JsonOutput;
+
 definition(
     name: "HundredGraphs Logger",
     namespace: "ipstas",
@@ -77,8 +79,8 @@ preferences {
 	//page(name: "createTokenPage")
 }
 
-def version() { return "00.00.08" }
-def gsVersion() { return "00.00.01" }
+def version() { return "00.00.09" }
+//def gsVersion() { return "00.00.01" }
 
 def mainPage() {
 	dynamicPage(name:"mainPage", uninstall:true, install:true) {
@@ -118,9 +120,18 @@ def mainPage() {
 				// title: "Assign an app name",
 				// defaultValue: "HundredGraphs Logger",
 				// required: false
-			label title: "Assign a name", required: false
+			label title: "Assign a name", defaultValue: "HundredGraphs Logger", required: false
 			mode title: "Set for specific mode(s)", required: false
 			if (state.installed) {		
+				
+				href(name: "graphs",
+				title: "View your Graphs",
+				//paragraph image: "https://res.cloudinary.com/orangry/image/upload/v1554557246/hundredgraphs/HundredGraphs_620x620.png",
+				required: false,
+				style: "external",
+				url: "https://www.hundredgraphs.com/dashboard",
+				description: "View your graphs and feeds on HundredGraphs.com")
+				
 				getPageLink("aboutPageLink", "About HundredGraphs Logger", "aboutPage", null, "Tap to view documentation, version and additional information.", "https://res.cloudinary.com/orangry/image/upload/v1554557246/hundredgraphs/HundredGraphs_620x620.png")
                 //Feed result: response?.status
 			}
@@ -142,11 +153,11 @@ private getLoggingStatusContent() {
         	paragraph required: false,
 				"Version: ${version()}"
             paragraph required: false,
-				"Success: ${state.loggingStatus?.result}"
+				"Upload: ${status?.result}"
             paragraph required: false,
-				"Events Logged: ${status.eventsLogged} \nLast Execution:\n - HTTP code: ${status.code}\n - Events From: ${status.start}\n - Events To: ${status.end}\n - Run Time: ${status.runTime} \n - ${status.details}"
+				"Events Logged: ${status.eventsLogged} \nLast Execution:\n - HTTP code: ${status.code}\n - Events From: ${status.start}\n - Events To: ${status.end}\n - Run Time: ${status.runTime} \n - ${status.dropped}"
             paragraph required: false,
-				"HTTP codes: \n 200 - full or partial success \n 301/302 - check your url \n 402 - you are trying to use paid services \n 408 - you are sending data too often \n 501 - timeout, server is unavailable at the moment"                
+				"HTTP codes: \n 200 - full or partial success \n 301/302 - check your url \n 401 - wrong API key \n 402 - you are trying to use paid services \n 408 - you are sending data too often \n 501 - timeout, server is unavailable at the moment"                
         }
 	} else {
 		section("Logging Status") {			
@@ -155,9 +166,9 @@ private getLoggingStatusContent() {
 			paragraph required: false,
 				"Version: ${version()}"		
             paragraph required: false,
-				"Success: ${state.loggingStatus?.result}"
+				"Upload: ${status?.result}"
 			paragraph required: false,
-				"Events Logged: ${status.eventsLogged} \nLast Execution:\n - HTTP code: ${status.code}\n - Events From: ${status.start}\n - Events To: ${status.end}\n - Run Time: ${status.runTime} \n - ${status.details}"
+				"Events Logged: ${status.eventsLogged} \nLast Execution:\n - HTTP code: ${status.code}\n - Events From: ${status.start}\n - Events To: ${status.end}\n - Run Time: ${status.runTime} \n ${status.dropped}"
 		}
     }
 }
@@ -171,19 +182,20 @@ def aboutPage() {
 		
 			paragraph image: "https://res.cloudinary.com/orangry/image/upload/v1554557246/hundredgraphs/HundredGraphs_620x620.png",
 				title: "HundredGraphs Logger\nby ipstas (@ipstas)",
-				required: false,
+				required: false, 
 				"Allows you to choose devices and attributes and it logs the device, event name, event value, event time, and event description of all the events that have occured since the last time it ran."
 				
 			paragraph title: "Version",
 				required: false,
 				"SmartApp: ${version()}"
 				
-			 href(name: "documentationLink",
-				 title: "View Documentation",
-				 required: false,
-				 style: "external",
-				 url: "http://htmlpreview.github.com/?https://github.com/ipstas/ipstas-smarththings-hundredgraphs/blob/master/README.md",
-				 description: "Additional information about the SmartApp and installation instructions.")
+			href(name: "documentationLink",
+				title: "View Documentation",
+				required: false,
+				style: "external",
+				//url: "http://htmlpreview.github.com/?https://github.com/ipstas/ipstas-smarththings-hundredgraphs/blob/master/README.md",
+				url: "https://www.hundredgraphs.com/apidocs",
+				description: "Additional information about the SmartApp and installation instructions.")
 		}		
 	}
 }
@@ -299,7 +311,7 @@ private getOptionsPageContent() {
 	section ("Logging Options") {
 		input "apiKey", "text",
 			title: "API key:",
-			defaultValue: "None",
+			//defaultValue: "None",
 			required: true
 		input "node", "text",
 			title: "Node (should be unique for each hub):",
@@ -308,7 +320,7 @@ private getOptionsPageContent() {
 		input "logFrequency", "enum",
 			title: "Log Events Every:",
 			required: false,
-			defaultValue: "1 Minute",
+			defaultValue: "10 Minutes",
 			options: ["1 Minute", "5 Minutes", "10 Minutes", "15 Minutes", "30 Minutes", "1 Hour", "3 Hours"]
 		input "logCatchUpFrequency", "enum",
 			title: "Maximum Catch-Up Interval:\n(Must be greater than 'Log Events Every':",
@@ -318,7 +330,7 @@ private getOptionsPageContent() {
 		input "maxEvents", "number",
 			title: "Maximum number of events to log for each device per execution. (1 - 200)",
 			range: "1..200",
-			defaultValue: maxEventsSetting,
+			defaultValue: 50,
 			required: false
 		input "logDesc", "bool",
 			title: "Log Event Descripion?",
@@ -326,30 +338,30 @@ private getOptionsPageContent() {
 			required: false
 		input "useValueUnitDesc", "bool",
 			title: "Use Value and Unit for Description?",
-			defaultValue: true,
-			required: false
-		input "logReporting", "bool",
-			title: "Include additional columns for short date and hour?",
 			defaultValue: false,
 			required: false
-		input "deleteExtraColumns", "bool",
-			title: "Delete Extra Columns?",
-			description: "Enable this setting to increase the log size.",
-			defaultValue: true,
-			required: false
-		input "archiveType", "enum",
+		// input "logReporting", "bool",
+			// title: "Include additional columns for short date and hour?",
+			// defaultValue: false,
+			// required: false
+		// input "deleteExtraColumns", "bool",
+			// title: "Delete Extra Columns?",
+			// description: "Enable this setting to increase the log size.",
+			// defaultValue: false,
+			// required: false
+/* 		input "archiveType", "enum",
 			title: "Archive Type:",
 			defaultValue: "None",
 			submitOnChange: true,
 			required: false,
-			options: ["None", "Out of Space", "Events"]
-		if (settings?.archiveType && !(settings?.archiveType in ["None", "Out of Space"])) {
+			options: ["None", "Out of Space", "Events"] */
+/* 		if (settings?.archiveType && !(settings?.archiveType in ["None", "Out of Space"])) {
 			input "archiveInterval", "number",
 				title: "Archive After How Many Events?",
 				defaultValue: 50000,
 				required: false,
 				range: "100..100000"
-		}
+		} */
 	}
 	section("${getWebAppName()}") {		
 		input "loggerAppUrl", "text",
@@ -371,27 +383,27 @@ private getOptionsPageContent() {
 			title: "Types of messages to write to Live Logging:",
 			multiple: true,
 			required: false,
-			defaultValue: ["debug", "info"],
-			options: ["debug", "info", "trace"]
+			defaultValue: ["info"],
+			options: ["info", "debug", "trace"]
 	}
 }
 
-def createTokenPage() {
-	dynamicPage(name:"createTokenPage") {
+// def createTokenPage() {
+	// dynamicPage(name:"createTokenPage") {
 		
-		disposeAppEndpoint()
-		initializeAppEndpoint()		
+		// disposeAppEndpoint()
+		// initializeAppEndpoint()		
 		
-		section() {
-			if (state.endpoint) {				
-				paragraph "A new token has been generated."
-			}
-			else {
-				paragraph "Unable to generate a new OAuth token.\n\n${getInitializeEndpointErrorMessage()}"				
-			}
-		}
-	}
-}
+		// section() {
+			// if (state.endpoint) {				
+				// paragraph "A new token has been generated."
+			// }
+			// else {
+				// paragraph "Unable to generate a new OAuth token.\n\n${getInitializeEndpointErrorMessage()}"				
+			// }
+		// }
+	// }
+// }
 
 private getPageLink(linkName, linkText, pageName, args=null,desc="",image=null) {
 	def map = [
@@ -420,11 +432,12 @@ private buildSummary(items) {
 }
 
 def uninstalled() {
-	logTrace "Executing uninstalled()"
-	disposeAppEndpoint()
+	logInfo "${app.label} uninstalled()"
+	//disposeAppEndpoint()
+	state.installed = false
 }
 
-private disposeAppEndpoint() {
+/* private disposeAppEndpoint() {
 	if (state.endpoint) {
 		try {
 			logTrace "Revoking access token"
@@ -435,64 +448,62 @@ private disposeAppEndpoint() {
 		}
 		state.endpoint = ""
 	}
-}
+} */
 
 def installed() {	
-	logTrace "${app.label} Executing installed()"
+	logInfo "${app.label} installed"
 	//initializeAppEndpoint()
 	state.installed = true
 }
 
 def updated() {
-	logTrace "${app.label} Executing updated()"
-	state.installed = true
-	
-	unschedule()
-	unsubscribe()
+	//logTrace "${app.label} Executing updated()"
+	state.installed = true	
+	unschedule(logNewEvents)
+	//unsubscribe()
 	
 	//initializeAppEndpoint()
 	
-	logDebug "${app.label} [updated] freq: ${settings?.logFrequency}, url: ${settings?.loggerAppUrl}"
-	
+	logInfo "${app.label} [updated] freq: ${settings?.logFrequency}, url: ${settings?.loggerAppUrl}"	
 	state.app = "SmartThings"
+
 	//state.version = ${version()}
 
 	if (settings?.apiKey) {
 		state.apiKey = settings?.apiKey
 	}	else {
-		logDebug "${app.label} Unconfigured - you need API key ${settings?.apiKey}"
+		logInfo "${app.label} Unconfigured - you need API key ${settings?.apiKey}"
 	}
 
 	if (settings?.apiKey && settings?.logFrequency && settings?.maxEvents && settings?.logDesc != null && verifyWebAppUrl(settings?.loggerAppUrl)) {
 		state.optionsConfigured = true
 	}	else {
-		logDebug "${app.label} Unconfigured - Options. ${loggerUrlDev()} settings?.loggerAppUrl"
+		logInfo "${app.label} Unconfigured - Options. ${loggerUrlDev()} settings?.loggerAppUrl"
 		state.optionsConfigured = false
 	}
 	
 	if (settings?.allowedAttributes) {
 		state.attributesConfigured = true
 	}	else {
-		logDebug "${app.label} Unconfigured - Choose Events"
+		logInfo "${app.label} Unconfigured - Choose Events"
 	}
 	
 	if (getSelectedDevices()) {
 		state.devicesConfigured = true
 	}	else {
-		logDebug "${app.label} Unconfigured - Choose Devices"
+		logInfo "${app.label} Unconfigured - Choose Devices"
 	}
 	
 	state.allConfigured = (state.apiKey && state.optionsConfigured && state.attributesConfigured && state.devicesConfigured)
 	
 	if  (state.allConfigured) {
 		def logFrequency = (settings?.logFrequency ?: "10 Minutes").replace(" ", "")
-		
-		"runEvery${logFrequency}"(logNewEvents)
-		
-		//verifyGSVersion()
-		runIn(10, startLogNewEvents)
+		runIn(50, logInitEvents) // run it now
+		"runEvery${logFrequency}"(logNewEvents)	//and then schedule it
+		runEvery3Hours(logCurrentEvents) //get current state
+		//runEvery1Minute(logCurrentEvents) //get current state
 	} else {
-		logWarn "${app.label} Event Logging is disabled because there are unconfigured settings. ${settings?.loggerAppUrl}, ${settings?.apiKey}"
+		logInfo "${app.label} Event Logging is disabled because there are unconfigured settings. ${settings?.loggerAppUrl}, ${settings?.apiKey}"
 	}
 }
 
@@ -512,7 +523,7 @@ private verifyWebAppUrl(url) {
 }
 
 // Requests the version from the Google Script and displays a warning if it's not the expected version.
-private verifyGSVersion() {
+/* private verifyGSVersion() {
 	def actualGSVersion = ""
 	
 	logTrace "${app.label} Retrieving Google Script Code version of the ${getWebAppName()}"
@@ -538,14 +549,88 @@ private verifyGSVersion() {
 	catch(e) {
 		logWarn "Failed to retrieve Google Script Version.  Error: ${e.message}"
 	}	
+} */
+
+def logInitEvents() {
+	logTrace "logInitialEvents start"
+	def status = state.loggingStatus ?: [:]
+	
+	// Move the date range to the next position unless the google script failed last time or was skipped due to the sheet being archived.
+	// if (!status.success || status.eventsArchived) {
+		// status.lastEventTime = status.firstEventTime
+	// }
+	
+	status.success = null
+	status.finished = null
+	status.eventsArchived = null
+	status.eventsLogged = 0
+	status.started = new Date().time
+	
+	//status.firstEventTime = getFirstEventTimeMS(status.lastEventTime)
+	
+	//status.lastEventTime = getNewLastEventTimeMS(status.started, (status.firstEventTime + 1000))
+	
+	//def startDate = new Date(status.firstEventTime + 1000)
+	//def endDate = new Date(status.lastEventTime)
+	
+	state.loggingStatus = status
+
+	def events = getInitEvents()
+	def eventCount = events?.size ?: 0
+	def actionMsg = eventCount > 0 ? ", posting them to ${getWebAppName()}" : ""
+	
+	logDebug "${app.label} SmartThings found initial devices ${String.format('%,d', eventCount)} ${actionMsg}"
+	
+	if (events) {
+		postEventsToLogger(events)
+	}
+	else {		
+		state.loggingStatus.success = true
+		state.loggingStatus.finished = new Date().time
+	}
 }
 
-def startLogNewEvents() {
-	logNewEvents()
+def logCurrentEvents() {
+	logTrace "${app.label} logCurrentEvents start"
+	def status = state.loggingStatus ?: [:]
+	
+	// Move the date range to the next position unless the google script failed last time or was skipped due to the sheet being archived.
+	// if (!status.success || status.eventsArchived) {
+		// status.lastEventTime = status.firstEventTime
+	// }
+	
+	status.success = null
+	status.finished = null
+	status.eventsArchived = null
+	status.eventsLogged = 0
+	status.started = new Date().time
+	
+	//status.firstEventTime = getFirstEventTimeMS(status.lastEventTime)
+	
+	//status.lastEventTime = getNewLastEventTimeMS(status.started, (status.firstEventTime + 1000))
+	
+	//def startDate = new Date(status.firstEventTime + 1000)
+	//def endDate = new Date(status.lastEventTime)
+	
+	state.loggingStatus = status
+
+	def events = getCurrentEvents()
+	def eventCount = events?.size ?: 0
+	def actionMsg = eventCount > 0 ? ", posting them to ${getWebAppName()}" : ""
+	
+	logDebug "${app.label} SmartThings found current devices states ${String.format('%,d', eventCount)} ${actionMsg}"
+	
+	if (events) {
+		postEventsToLogger(events)
+	}
+	else {		
+		state.loggingStatus.success = true
+		state.loggingStatus.finished = new Date().time
+	}
 }
 
 def logNewEvents() {	
-	logWarn " "
+	logTrace "${app.label} logNewEvents start"
 	def status = state.loggingStatus ?: [:]
 	
 	// Move the date range to the next position unless the google script failed last time or was skipped due to the sheet being archived.
@@ -671,7 +756,7 @@ private postEventsToLogger(events) {
 		body: jsonData
 	]	
 	
-	logTrace("[postEventsToLogger] params: ${params}")
+	logTrace("${app.label} [postEventsToLogger] params: ${params}")
 	asynchttp_v1.post(processLogEventsResponse, params)
 }
 
@@ -689,19 +774,19 @@ def processLogEventsResponse(response, data) {
 		state.loggingStatus.success = true
 		state.loggingStatus.finished = new Date().time
 	} else if (response?.status == 301) {
-		logTrace "${app.label} ${getWebAppName()} Response: ${response.status}, check your URL settings"
+		logTrace "${app.label} Response: ${response.status}, check your URL settings"
 	} else if (response?.status == 302) {
-		logTrace "${app.label} ${getWebAppName()} Response: ${response.status}, check your URL settings"
+		logTrace "${app.label} Response: ${response.status}, check your URL settings"
 	} else if (response?.status == 402) {
-		logTrace "${app.label} ${getWebAppName()} [processLogEventsResponse] Response: ${response.status}, ${response.errorJson}"
+		logTrace "${app.label} Response: ${response.status}, ${response.errorJson}"
         //logWarn "${app.label} ${getWebAppName()} [processLogEventsResponse]2 Response.data: ${response.errorJson}"
 	} else if (response?.status == 408) {
-		logTrace "${app.label} ${getWebAppName()} [processLogEventsResponse] Response: ${response.status}, ${response.errorJson}"
+		logTrace "${app.label} Response: ${response.status}, ${response.errorJson}"
         //logWarn "${app.label} ${getWebAppName()} [processLogEventsResponse]2 Response.data: ${response.errorJson}"
 	} else if (response?.status == 501) {
 		logTrace "${app.label} Response: ${response.status}. Timeout while waiting for HundredGraphs"
 	} else {
-		logTrace "${app.label} Unexpected response from ${getWebAppName()}: ${response.status}, response.data: ${response.data}, ${response?.errorMessage}"
+		logTrace "${app.label} Unexpected response: ${response.status}, response.data: ${response?.data}, ${response?.errorMessage}"
 	}
 	//logTrace "${app.label} ${getWebAppName()} response.status: ${response.status} "
 	updateLoggingStatus(state, response)
@@ -739,61 +824,79 @@ def updateLoggingStatus(state, response) {
 	def status = state.loggingStatus ?: [:]
 	def data
     def json
-    try{ 
-		json = response?.json ?: [:]
-        //logTrace "${app.label} ${getWebAppName()} [updateLoggingStatus]0 \njson: ${json}"
-    } catch(e) {
-    	json = response?.errorJson ?: [:]
-        //logTrace "${app.label} ${getWebAppName()} [updateLoggingStatus]0 \nerrJson: ${json}"
-    }
 	
-	//logTrace "${app.label} ${getWebAppName()} [updateLoggingStatus] state: ${state}; status: ${status}; json: ${json}"
+	if (response.hasProperty('json')){
+		//logTrace "${app.label} ${getWebAppName()} [updateLoggingStatus] JSON!!! \nstatus: ${status}"
+		json = response?.json ?: [:]
+	} else {
+		logTrace "${app.label} ${getWebAppName()} [updateLoggingStatus] NO! JSON \nstatus: ${status}"
+		status.success = false
+	}
+	
+/*     try{ 
+		json = response?.json ?: [:]
+        logTrace "${app.label} ${getWebAppName()} [updateLoggingStatus]0 \njson: ${json}"
+    } catch(e) {
+		if (response.hasProperty('errorJson'))
+			json = response?.errorJson ?: [:]
+        logTrace "${app.label} ${getWebAppName()} [updateLoggingStatus]0 no JSON ${json}"
+    } */
+	
+	//json = response?.json ?: [:]
+	
+	//logTrace "${app.label} [updateLoggingStatus] state: ${state}; status: ${status}; json: ${json}"
 	
 	if (json) {
     	data = json
 		status.success = data?.res
         status.code = response?.status
         status.details = data.details ?: ''
+        status.dropped = data.dropped ?: ''
 		//status.eventsArchived = data.eventsArchived
 		//status.logIsFull = data.logIsFull
 		//status.gsVersion = data.version
 		status.finished = new Date().time
 		status.eventsLogged = data?.monitors
         status.eventsSent = data?.monitors
+		//status.dropped = new JsonBuilder( data?.dropped ).toPrettyString()
+		//status.dropped = JsonOutput.toJson( data?.dropped )
 		//status.totalEventsLogged = data.totalEventsLogged
 		//status.freeSpace = data.freeSpace
 		
 		if (data.error) {
 			logDebug "${app.label} ${getWebAppName()} Reported: ${data.error}"
 		}
-        //logTrace "${app.label} ${getWebAppName()} [updateLoggingStatus] logged: ${status.eventsLogged}; status: ${status}"
+        //logTrace "${app.label} [updateLoggingStatus] logged: ${status.eventsLogged}; status: ${status}"
 	} else {
 		status.success = false
 		logDebug "${app.label} The ${getWebAppName()} [updateLoggingStatus] postback has no data."
 	}	
 	state.loggingStatus = status
-	//logTrace "${app.label} [updateLoggingStatus] status: ${status}"
+	//logTrace "${app.label} [updateLoggingStatus] end: ${status}"
+	//logTrace JsonOutput.toJson( data?.dropped )
+	//logTrace "${app.label} [updateLoggingStatus] ${status?.dropped} )"
+	//logTrace new JsonBuilder( data?.dropped ).toPrettyString() 
 	logLoggingStatus()
 }
 
 private logLoggingStatus() {
 	//logTrace "[logLoggingStatus]0 state: ${state}"
 	def status = getFormattedLoggingStatus()
-    logDebug "${app.label} [logLoggingStatus] status: ${status}"
+    //logDebug "${app.label} [logLoggingStatus] status: ${status}"
 	if (status.logIsFull) {
 		logWarn "${app.label} HG is Out of Space"
 	}
 	if (state.loggingStatus?.success) {
-		if (status.eventsArchived) {
-			logDebug "${app.label} ${getWebAppName()} archived events in ${status.runTime}."
-		}
-		else {
-			logDebug "${app.label} ${getWebAppName()} logged ${status.eventsLogged} events between ${status.start} and ${status.end} in ${status.runTime}. code: ${status.code}, details: ${status.details}"			
-		}		
+		
+		logInfo "${app.label} logged ${status.result} ${status.eventsLogged} events between ${status.start} and ${status.end} in ${status.runTime}."
+		logDebug "${app.label} logged code: ${status.code} monitors: ${status?.m} dropped: ${status?.dropped}"
+		//logTrace "${app.label} logged code: ${status.code} details: ${status?.details}"						
 	}
 	else {
-		logWarn "${app.label} ${getWebAppName()} failed to log events between ${status.start} and ${status.end}. code: ${status.code}, details: ${status.details}"
+		logWarn "${app.label} failed to log events between ${status.start} and ${status.end}. code: ${status.code}, details: ${status.details}"
 	}	
+	logTrace "${app.label} end.\n"	
+	
 	
 	//logTrace "HG hookVersion: ${state.loggingStatus?.hookVersion}, Total Events Logged: ${status.totalEventsLogged}, Used Space: ${status.usedSpace} records"
 	//logTrace "HG hookVersion: ${state.loggingStatus?.hookVersion}, Used Space: ${status.usedSpace} records"
@@ -810,9 +913,59 @@ private getFormattedLoggingStatus() {
 		runTime: "${((safeToLong(status.finished) - safeToLong(status.started)) / 1000)} seconds",
 		eventsLogged: "${String.format('%s', status.eventsLogged)}",
         details: "${String.format('%s', status.details)}",
+        dropped: "${String.format('%s', status.dropped)}",
 		//totalEventsLogged: "${String.format('%,d', safeToLong(status.totalEventsLogged))}"
 		//usedSpace: status.usedSpace
 	]
+}
+
+private getInitEvents() {	
+	
+	def events = []
+	
+	getSelectedDevices()?.each  { device ->
+		getDeviceAllowedAttrs(device?.displayName)?.each { attr ->
+			//logTrace "checking device: ${device?.displayName} ${attr}"
+			device.currentState("${attr}")?.each { event ->
+				events << [
+					time: event.date?.time,
+					//time: event.date,
+					id: device.id,
+					type: "${attr}",
+					key: device.displayName,
+					value: event.value,
+					//desc: getEventDesc(event)
+				]
+			}
+		}
+	}
+    logDebug "${app.label} [getNewEvents] Retrieving Initial Events count: ${events?.size}"
+	logTrace "${app.label} [getInitEvents] Retrieving Initial Events: ${events}"
+	return events?.unique()?.sort { it.time }
+}
+
+private getCurrentEvents() {	
+	
+	def events = []
+	
+	getSelectedDevices()?.each  { device ->
+		getDeviceAllowedAttrs(device?.displayName)?.each { attr ->
+			//logTrace "checking device: ${device?.displayName} ${attr}"
+			device.currentState("${attr}")?.each { event ->
+				events << [
+					time: new Date(),
+					id: device.id,
+					type: "${attr}",
+					key: device.displayName,
+					value: event.value,
+					//desc: getEventDesc(event)
+				]
+			}
+		}
+	}
+    logDebug "${app.label} [getCurrentEvents] Retrieving Current Events count: ${events?.size}"
+	logTrace "${app.label} [getCurrentEvents] Retrieving Current Events: ${events}"
+	return events?.unique()?.sort { it.time }
 }
 
 private getNewEvents(startDate, endDate) {	
@@ -824,18 +977,19 @@ private getNewEvents(startDate, endDate) {
 			//logTrace "checking device: ${device?.displayName} ${attr}"
 			device.statesBetween("${attr}", startDate, endDate, [max: maxEventsSetting])?.each { event ->
 				events << [
-					time: event.date?.time,
+					//time: event.date?.time,
+					time: event.date,
 					id: event.deviceId,
-					device: device.displayName,
 					type: "${attr}",
+					key: device.displayName,
 					value: event.value,
 					desc: getEventDesc(event)
 				]
 			}
 		}
 	}
-    logDebug " "
-	logTrace "${app.label} [getNewEvents] Retrieving Events from ${startDate} to ${endDate} count: ${events?.size} - ${events}"
+    logDebug "${app.label} [getNewEvents] Retrieving Events from ${startDate} to ${endDate} count: ${events?.size}"
+	logTrace "${app.label} [getNewEvents] Retrieving Events from ${startDate} to ${endDate} ${events}"
 	return events?.unique()?.sort { it.time }
 }
 
@@ -1076,14 +1230,14 @@ private getCapabilities() {
 	// ]
 // }
 
-private getArchiveTypeOptions() {
-	[
-		[name: "None"],
-		[name: "Out of Space"],
-		[name: "Weeks", defaultVal: 2, range: "1..52"],
-		[name: "Events", defaultVal: 25000, range: "1000..100000"]
-	]
-}
+// private getArchiveTypeOptions() {
+	// [
+		// [name: "None"],
+		// [name: "Out of Space"],
+		// [name: "Weeks", defaultVal: 2, range: "1..52"],
+		// [name: "Events", defaultVal: 25000, range: "1000..100000"]
+	// ]
+// }
 
 
 private getWebAppName() {
@@ -1100,10 +1254,6 @@ private loggerUrlDev() {
 private getWebAppBaseUrl() {
 	return "https://www.hundredgraphs.com/hook/"
 	//return "https://script.google.com/macros/s/"
-}
-
-private getWebAppBaseUrl2() {
-	return "https://script.google.com/macros/u/"
 }
 
 long safeToLong(val, defaultVal=0) {
