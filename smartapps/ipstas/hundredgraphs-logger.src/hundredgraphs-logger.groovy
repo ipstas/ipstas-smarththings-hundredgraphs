@@ -79,7 +79,7 @@ preferences {
 	//page(name: "createTokenPage")
 }
 
-def version() { return "00.00.10" }
+def version() { return "00.00.11" }
 //def gsVersion() { return "00.00.01" }
 
 def mainPage() {
@@ -554,124 +554,6 @@ private verifyWebAppUrl(url) {
 	}	
 } */
 
-def logInitEvents() {
-	logTrace "logInitialEvents start"
-	def status = state.loggingStatus ?: [:]
-	
-	// Move the date range to the next position unless the google script failed last time or was skipped due to the sheet being archived.
-	// if (!status.success || status.eventsArchived) {
-		// status.lastEventTime = status.firstEventTime
-	// }
-	
-	status.success = null
-	status.finished = null
-	status.eventsArchived = null
-	status.eventsLogged = 0
-	status.started = new Date().time
-	
-	//status.firstEventTime = getFirstEventTimeMS(status.lastEventTime)
-	
-	//status.lastEventTime = getNewLastEventTimeMS(status.started, (status.firstEventTime + 1000))
-	
-	//def startDate = new Date(status.firstEventTime + 1000)
-	//def endDate = new Date(status.lastEventTime)
-	
-	state.loggingStatus = status
-
-	def events = getInitEvents()
-	def eventCount = events?.size ?: 0
-	def actionMsg = eventCount > 0 ? ", posting them to ${getWebAppName()}" : ""
-	
-	logDebug "${app.label} SmartThings found initial devices ${String.format('%,d', eventCount)} ${actionMsg}"
-	
-	if (events) {
-		postEventsToLogger(events)
-	}
-	else {		
-		state.loggingStatus.success = true
-		state.loggingStatus.finished = new Date().time
-	}
-}
-
-def logCurrentEvents() {
-	logTrace "${app.label} logCurrentEvents start"
-	def status = state.loggingStatus ?: [:]
-	
-	// Move the date range to the next position unless the google script failed last time or was skipped due to the sheet being archived.
-	// if (!status.success || status.eventsArchived) {
-		// status.lastEventTime = status.firstEventTime
-	// }
-	
-	status.success = null
-	status.finished = null
-	status.eventsArchived = null
-	status.eventsLogged = 0
-	status.started = new Date().time
-	
-	//status.firstEventTime = getFirstEventTimeMS(status.lastEventTime)
-	
-	//status.lastEventTime = getNewLastEventTimeMS(status.started, (status.firstEventTime + 1000))
-	
-	//def startDate = new Date(status.firstEventTime + 1000)
-	//def endDate = new Date(status.lastEventTime)
-	
-	state.loggingStatus = status
-
-	def events = getCurrentEvents()
-	def eventCount = events?.size ?: 0
-	def actionMsg = eventCount > 0 ? ", posting them to ${getWebAppName()}" : ""
-	
-	logDebug "${app.label} SmartThings found current devices states ${String.format('%,d', eventCount)} ${actionMsg}"
-	
-	if (events) {
-		postEventsToLogger(events)
-	}
-	else {		
-		state.loggingStatus.success = true
-		state.loggingStatus.finished = new Date().time
-	}
-}
-
-def logNewEvents() {	
-	logTrace "${app.label} logNewEvents start"
-	def status = state.loggingStatus ?: [:]
-	
-	// Move the date range to the next position unless the google script failed last time or was skipped due to the sheet being archived.
-	if (!status.success || status.eventsArchived) {
-		status.lastEventTime = status.firstEventTime
-	}
-	
-	status.success = null
-	status.finished = null
-	status.eventsArchived = null
-	status.eventsLogged = 0
-	status.started = new Date().time
-	
-	status.firstEventTime = getFirstEventTimeMS(status.lastEventTime)
-	
-	status.lastEventTime = getNewLastEventTimeMS(status.started, (status.firstEventTime + 1000))
-	
-	def startDate = new Date(status.firstEventTime + 1000)
-	def endDate = new Date(status.lastEventTime)
-	
-	state.loggingStatus = status
-	state.interval = endDate - startDate
-	status.interval = state.interval
-
-	def events = getNewEvents(startDate, endDate)
-	def eventCount = events?.size ?: 0
-	def actionMsg = eventCount > 0 ? ", posting them to ${getWebAppName()}" : ""
-	
-	logDebug "${app.label} SmartThings found ${String.format('%,d', eventCount)} events for status.interval interval, between ${getFormattedLocalTime(startDate.time)} and ${getFormattedLocalTime(endDate.time)}${actionMsg}"
-	
-	if (events) {
-		postEventsToLogger(events)
-	}
-	else {		
-		state.loggingStatus.success = true
-		state.loggingStatus.finished = new Date().time
-	}
-}
 
 private getFirstEventTimeMS(lastEventTimeMS) {
 	def firstRunMS = (3 * 60 * 60 * 1000) // 3 Hours 
@@ -736,34 +618,6 @@ def hubInfo(){
     return hub
 }
 
-private postEventsToLogger(events) {
-	def hub = location.hubs[0]
-	def jsonOutput = new groovy.json.JsonOutput()
-	def jsonData = jsonOutput.toJson([
-		apiKey: settings?.apiKey,
-		node: settings?.node,
-		app: state.app,
-		version: "${version()}",
-        hubId: "${hub.id}",
-        interval: settings?.logFrequency,
-		//postBackUrl: "${state.endpoint}logger",
-		//archiveOptions: getArchiveOptions(),
-		//logDesc: (settings?.logDesc != false),
-		logReporting: (settings?.logReporting == true),
-		//deleteExtraColumns: (settings?.deleteExtraColumns == true),
-		events: events
-	])
-
-	def params = [
-		//uri: "${settings?.googleWebAppUrl}",
-		uri: "${settings?.loggerAppUrl}",
-		contentType: "application/json",
-		body: jsonData
-	]	
-	
-	logTrace("${app.label} [postEventsToLogger] params: ${params}")
-	asynchttp_v1.post(processLogEventsResponse, params)
-}
 
 private getArchiveOptions() {
 	return [
@@ -951,6 +805,7 @@ private getFormattedLoggingStatus() {
 	]
 }
 
+// initial Events
 private getInitEvents() {	
 	
 	def events = []
@@ -975,7 +830,7 @@ private getInitEvents() {
 	logTrace "${app.label} [getInitEvents] Retrieving Initial Events: ${events}"
 	return events?.unique()?.sort { it.time }
 }
-
+// current all Events
 private getCurrentEvents() {	
 	
 	def events = []
@@ -999,7 +854,7 @@ private getCurrentEvents() {
 	logTrace "${app.label} [getCurrentEvents] Retrieving Current Events: ${events}"
 	return events?.unique()?.sort { it.time }
 }
-
+// new Events since last upload 
 private getNewEvents(startDate, endDate) {	
 	
 	def events = []
@@ -1024,6 +879,160 @@ private getNewEvents(startDate, endDate) {
 	logTrace "${app.label} [getNewEvents] Retrieving Events from ${startDate} to ${endDate} ${events}"
 	return events?.unique()?.sort { it.time }
 }
+// upload events
+def logInitEvents() {
+	def sender = 'logInitEvents'
+	logTrace "logInitialEvents start"
+	def status = state.loggingStatus ?: [:]
+	
+	// Move the date range to the next position unless the google script failed last time or was skipped due to the sheet being archived.
+	// if (!status.success || status.eventsArchived) {
+		// status.lastEventTime = status.firstEventTime
+	// }
+	
+	status.success = null
+	status.finished = null
+	status.eventsArchived = null
+	status.eventsLogged = 0
+	status.started = new Date().time
+	
+	//status.firstEventTime = getFirstEventTimeMS(status.lastEventTime)
+	
+	//status.lastEventTime = getNewLastEventTimeMS(status.started, (status.firstEventTime + 1000))
+	
+	//def startDate = new Date(status.firstEventTime + 1000)
+	//def endDate = new Date(status.lastEventTime)
+	
+	state.loggingStatus = status
+
+	def events = getInitEvents()
+	def eventCount = events?.size ?: 0
+	def actionMsg = eventCount > 0 ? ", posting them to ${getWebAppName()}" : ""
+	
+	logDebug "${app.label} SmartThings found initial devices ${String.format('%,d', eventCount)} ${actionMsg}"
+	
+	if (events) {
+		postEventsToLogger(status, sender, events)
+	}
+	else {		
+		state.loggingStatus.success = true
+		state.loggingStatus.finished = new Date().time
+	}
+}
+def logCurrentEvents() {
+	def sender = 'currentEvents'
+	logTrace "${app.label} logCurrentEvents start"
+	def status = state.loggingStatus ?: [:]
+	
+	// Move the date range to the next position unless the google script failed last time or was skipped due to the sheet being archived.
+	// if (!status.success || status.eventsArchived) {
+		// status.lastEventTime = status.firstEventTime
+	// }
+	
+	status.success = null
+	status.finished = null
+	status.eventsArchived = null
+	status.eventsLogged = 0
+	status.started = new Date().time
+	
+	//status.firstEventTime = getFirstEventTimeMS(status.lastEventTime)
+	
+	//status.lastEventTime = getNewLastEventTimeMS(status.started, (status.firstEventTime + 1000))
+	
+	//def startDate = new Date(status.firstEventTime + 1000)
+	//def endDate = new Date(status.lastEventTime)
+	
+	state.loggingStatus = status
+
+	def events = getCurrentEvents()
+	def eventCount = events?.size ?: 0
+	def actionMsg = eventCount > 0 ? ", posting them to ${getWebAppName()}" : ""
+	
+	logDebug "${app.label} SmartThings found current devices states ${String.format('%,d', eventCount)} ${actionMsg}"
+	
+	if (events) {
+		postEventsToLogger(status, sender, events)
+	}
+	else {		
+		state.loggingStatus.success = true
+		state.loggingStatus.finished = new Date().time
+	}
+}
+def logNewEvents() {	
+	def sender = 'newEvents'
+	logTrace "${app.label} logNewEvents start"
+	def status = state.loggingStatus ?: [:]
+	
+	// Move the date range to the next position unless the google script failed last time or was skipped due to the sheet being archived.
+	if (!status.success || status.eventsArchived) {
+		status.lastEventTime = status.firstEventTime
+	}
+	
+	status.success = null
+	status.finished = null
+	status.eventsArchived = null
+	status.eventsLogged = 0
+	status.started = new Date().time
+	status.lastEventTime = status?.lastEventTime ?: 0
+	
+	status.firstEventTime = getFirstEventTimeMS(status.lastEventTime)
+	
+	status.lastEventTime = getNewLastEventTimeMS(status.started, (status.firstEventTime + 1000))
+	
+	def startDate = new Date(status.firstEventTime + 1000)
+	def endDate = new Date(status.lastEventTime)
+	
+	state.loggingStatus = status
+	state.interval = endDate - startDate
+	status.interval = state.interval
+
+	def events = getNewEvents(startDate, endDate)
+	def eventCount = events?.size ?: 0
+	def actionMsg = eventCount > 0 ? ", posting them to ${getWebAppName()}" : ""
+	
+	logDebug "${app.label} SmartThings found ${String.format('%,d', eventCount)} events for status.interval interval, between ${getFormattedLocalTime(startDate.time)} and ${getFormattedLocalTime(endDate.time)}${actionMsg}"
+	
+	if (events) {
+		postEventsToLogger(status, sender, events)
+	}
+	else {		
+		state.loggingStatus.success = true
+		state.loggingStatus.finished = new Date().time
+	}
+}
+// uploading events
+private postEventsToLogger(status, sender, events) {
+	def hub = location.hubs[0]
+	def jsonOutput = new groovy.json.JsonOutput()
+	def jsonData = jsonOutput.toJson([
+		apiKey: settings?.apiKey,
+		node: settings?.node,
+		app: state.app,
+		version: "${version()}",
+        hubId: "${hub.id}",
+		sender: sender,
+        interval: settings?.logFrequency,
+		current: status?.firstEventTime,
+		lastfull: status?.lastEventTime,
+		//postBackUrl: "${state.endpoint}logger",
+		//archiveOptions: getArchiveOptions(),
+		//logDesc: (settings?.logDesc != false),
+		logReporting: (settings?.logReporting == true),
+		//deleteExtraColumns: (settings?.deleteExtraColumns == true),
+		events: events
+	])
+
+	def params = [
+		//uri: "${settings?.googleWebAppUrl}",
+		uri: "${settings?.loggerAppUrl}",
+		contentType: "application/json",
+		body: jsonData
+	]	
+	
+	logTrace("${app.label} [postEventsToLogger] params: ${params}")
+	asynchttp_v1.post(processLogEventsResponse, params)
+}
+
 
 private getEventDesc(event) {
 	if (settings?.useValueUnitDesc != false) {
