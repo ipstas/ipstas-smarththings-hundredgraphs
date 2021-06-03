@@ -79,7 +79,7 @@ preferences {
 	//page(name: "createTokenPage")
 }
 
-def version() { return "00.00.09" }
+def version() { return "00.00.12" }
 //def gsVersion() { return "00.00.01" }
 
 def mainPage() {
@@ -145,32 +145,35 @@ def mainPage() {
 
 private getLoggingStatusContent() {
 	//logTrace "${app.label} [getLoggingStatusContent] success: ${state.loggingStatus?.success}, state: ${state}"
-	if (state.loggingStatus?.success == null) {
+	if (state.loggingStatus?.success == true) {
     	def status = getFormattedLoggingStatus();
         //state.loggingStatus?.success = false
-    	logDebug "${app.label} [getLoggingStatusContent] success: False, state: ${state}, status: ${status}"
+    	//logDebug "${app.label} [getLoggingStatusContent] success: ${state.loggingStatus?.success}, state: ${state}, status: ${status}"
         section("Logging Status") {		
         	paragraph required: false,
 				"Version: ${version()}"
             paragraph required: false,
 				"Upload: ${status?.result}"
             paragraph required: false,
-				"Events Logged: ${status.eventsLogged} \nLast Execution:\n - HTTP code: ${status.code}\n - Events From: ${status.start}\n - Events To: ${status.end}\n - Run Time: ${status.runTime} \n - ${status.dropped}"
-            paragraph required: false,
-				"HTTP codes: \n 200 - full or partial success \n 301/302 - check your url \n 401 - wrong API key \n 402 - you are trying to use paid services \n 408 - you are sending data too often \n 501 - timeout, server is unavailable at the moment"                
+				"Events Logged: ${status.eventsLogged} \nLast Execution:\n - HTTP code: ${status.code}\n - Events From: ${status.start}\n - Events To: ${status.end}\n - Run Time: ${status.runTime}\n - Dropped: ${status.dropped}"      
         }
 	} else {
-		section("Logging Status") {			
-			def status = getFormattedLoggingStatus()
-			
-			paragraph required: false,
-				"Version: ${version()}"		
+    	def status = getFormattedLoggingStatus();
+        //state.loggingStatus?.success = false
+    	//logDebug "${app.label} [getLoggingStatusContent] success: ${state.loggingStatus?.success}, state: ${state}, status: ${status}"
+        section("Logging Status") {		
+        	paragraph required: false,
+				"Version: ${version()}"
             paragraph required: false,
 				"Upload: ${status?.result}"
-			paragraph required: false,
-				"Events Logged: ${status.eventsLogged} \nLast Execution:\n - HTTP code: ${status.code}\n - Events From: ${status.start}\n - Events To: ${status.end}\n - Run Time: ${status.runTime} \n ${status.dropped}"
-		}
-    }
+            paragraph required: false,
+				"Upload: ${status?.details}"
+            paragraph required: false,
+				"Events Logged: ${status.eventsLogged} \nLast Execution:\n - HTTP code: ${status.code}\n - Events From: ${status.start}\n - Events To: ${status.end}\n - Run Time: ${status.runTime}"
+            paragraph required: false,
+				"HTTP codes: \n 200 - full or partial success \n 301/302 - check your url \n 401 - wrong API key \n 402 - you are trying to use paid services \n 429 - you are sending data too often \n 501 - timeout, server is unavailable at the moment"                
+        }
+	} 
 }
 
 def aboutPage() {
@@ -551,122 +554,6 @@ private verifyWebAppUrl(url) {
 	}	
 } */
 
-def logInitEvents() {
-	logTrace "logInitialEvents start"
-	def status = state.loggingStatus ?: [:]
-	
-	// Move the date range to the next position unless the google script failed last time or was skipped due to the sheet being archived.
-	// if (!status.success || status.eventsArchived) {
-		// status.lastEventTime = status.firstEventTime
-	// }
-	
-	status.success = null
-	status.finished = null
-	status.eventsArchived = null
-	status.eventsLogged = 0
-	status.started = new Date().time
-	
-	//status.firstEventTime = getFirstEventTimeMS(status.lastEventTime)
-	
-	//status.lastEventTime = getNewLastEventTimeMS(status.started, (status.firstEventTime + 1000))
-	
-	//def startDate = new Date(status.firstEventTime + 1000)
-	//def endDate = new Date(status.lastEventTime)
-	
-	state.loggingStatus = status
-
-	def events = getInitEvents()
-	def eventCount = events?.size ?: 0
-	def actionMsg = eventCount > 0 ? ", posting them to ${getWebAppName()}" : ""
-	
-	logDebug "${app.label} SmartThings found initial devices ${String.format('%,d', eventCount)} ${actionMsg}"
-	
-	if (events) {
-		postEventsToLogger(events)
-	}
-	else {		
-		state.loggingStatus.success = true
-		state.loggingStatus.finished = new Date().time
-	}
-}
-
-def logCurrentEvents() {
-	logTrace "${app.label} logCurrentEvents start"
-	def status = state.loggingStatus ?: [:]
-	
-	// Move the date range to the next position unless the google script failed last time or was skipped due to the sheet being archived.
-	// if (!status.success || status.eventsArchived) {
-		// status.lastEventTime = status.firstEventTime
-	// }
-	
-	status.success = null
-	status.finished = null
-	status.eventsArchived = null
-	status.eventsLogged = 0
-	status.started = new Date().time
-	
-	//status.firstEventTime = getFirstEventTimeMS(status.lastEventTime)
-	
-	//status.lastEventTime = getNewLastEventTimeMS(status.started, (status.firstEventTime + 1000))
-	
-	//def startDate = new Date(status.firstEventTime + 1000)
-	//def endDate = new Date(status.lastEventTime)
-	
-	state.loggingStatus = status
-
-	def events = getCurrentEvents()
-	def eventCount = events?.size ?: 0
-	def actionMsg = eventCount > 0 ? ", posting them to ${getWebAppName()}" : ""
-	
-	logDebug "${app.label} SmartThings found current devices states ${String.format('%,d', eventCount)} ${actionMsg}"
-	
-	if (events) {
-		postEventsToLogger(events)
-	}
-	else {		
-		state.loggingStatus.success = true
-		state.loggingStatus.finished = new Date().time
-	}
-}
-
-def logNewEvents() {	
-	logTrace "${app.label} logNewEvents start"
-	def status = state.loggingStatus ?: [:]
-	
-	// Move the date range to the next position unless the google script failed last time or was skipped due to the sheet being archived.
-	if (!status.success || status.eventsArchived) {
-		status.lastEventTime = status.firstEventTime
-	}
-	
-	status.success = null
-	status.finished = null
-	status.eventsArchived = null
-	status.eventsLogged = 0
-	status.started = new Date().time
-	
-	status.firstEventTime = getFirstEventTimeMS(status.lastEventTime)
-	
-	status.lastEventTime = getNewLastEventTimeMS(status.started, (status.firstEventTime + 1000))
-	
-	def startDate = new Date(status.firstEventTime + 1000)
-	def endDate = new Date(status.lastEventTime)
-	
-	state.loggingStatus = status
-
-	def events = getNewEvents(startDate, endDate)
-	def eventCount = events?.size ?: 0
-	def actionMsg = eventCount > 0 ? ", posting them to ${getWebAppName()}" : ""
-	
-	logDebug "${app.label} SmartThings found ${String.format('%,d', eventCount)} events between ${getFormattedLocalTime(startDate.time)} and ${getFormattedLocalTime(endDate.time)}${actionMsg}"
-	
-	if (events) {
-		postEventsToLogger(events)
-	}
-	else {		
-		state.loggingStatus.success = true
-		state.loggingStatus.finished = new Date().time
-	}
-}
 
 private getFirstEventTimeMS(lastEventTimeMS) {
 	def firstRunMS = (3 * 60 * 60 * 1000) // 3 Hours 
@@ -731,34 +618,6 @@ def hubInfo(){
     return hub
 }
 
-private postEventsToLogger(events) {
-	def hub = location.hubs[0]
-	def jsonOutput = new groovy.json.JsonOutput()
-	def jsonData = jsonOutput.toJson([
-		apiKey: settings?.apiKey,
-		node: settings?.node,
-		app: state.app,
-		version: "${version()}",
-        hubId: "${hub.id}",
-        frequency: settings?.logFrequency,
-		//postBackUrl: "${state.endpoint}logger",
-		//archiveOptions: getArchiveOptions(),
-		//logDesc: (settings?.logDesc != false),
-		logReporting: (settings?.logReporting == true),
-		//deleteExtraColumns: (settings?.deleteExtraColumns == true),
-		events: events
-	])
-
-	def params = [
-		//uri: "${settings?.googleWebAppUrl}",
-		uri: "${settings?.loggerAppUrl}",
-		contentType: "application/json",
-		body: jsonData
-	]	
-	
-	logTrace("${app.label} [postEventsToLogger] params: ${params}")
-	asynchttp_v1.post(processLogEventsResponse, params)
-}
 
 private getArchiveOptions() {
 	return [
@@ -774,20 +633,39 @@ def processLogEventsResponse(response, data) {
 		state.loggingStatus.success = true
 		state.loggingStatus.finished = new Date().time
 	} else if (response?.status == 301) {
-		logTrace "${app.label} Response: ${response.status}, check your URL settings"
+		state.loggingStatus.details = "${response?.status}, check your URL settings"
+		logTrace "${app.label} Response: ${state.loggingStatus.details}"
 	} else if (response?.status == 302) {
-		logTrace "${app.label} Response: ${response.status}, check your URL settings"
+		state.loggingStatus.details = "${response?.status}, check your URL settings"
+		logTrace "${app.label} Response: ${state.loggingStatus.details}"
 	} else if (response?.status == 402) {
-		logTrace "${app.label} Response: ${response.status}, ${response.errorJson}"
-        //logWarn "${app.label} ${getWebAppName()} [processLogEventsResponse]2 Response.data: ${response.errorJson}"
+		state.loggingStatus.details = "you are using extended features requiring payment. Reporting interval was switched to 600 secs. Response: ${response?.status}, ${response?.errorMessage}"
+		
+		try{
+			def interval = new Date(status?.end) - new Date(status?.start)
+			def logFrequency = settings?.logFrequency
+		}catch(err){
+			logTrace "${app.label} [processLogEventsResponse err] interval: ${err}, status: ${status}"
+		}
+/* 		if (logFrequency != "10 Minutes")
+			logFrequency = 10 */
+
+		logTrace "${app.label} [processLogEventsResponse] interval ${interval} ${logFrequency}"
+		
+		//unschedule(logNewEvents)
+		//runEvery10Minutes(logNewEvents)
+
 	} else if (response?.status == 408) {
-		logTrace "${app.label} Response: ${response.status}, ${response.errorJson}"
+		state.loggingStatus.details = "${response?.status}, ${response?.errorMessage}"
+	} else if (response?.status == 429) {
+		state.loggingStatus.details "${response?.status}, ${response?.errorMessage}"
         //logWarn "${app.label} ${getWebAppName()} [processLogEventsResponse]2 Response.data: ${response.errorJson}"
 	} else if (response?.status == 501) {
-		logTrace "${app.label} Response: ${response.status}. Timeout while waiting for HundredGraphs"
+		state.loggingStatus.details = "${response?.status}. Timeout while waiting for HundredGraphs"
 	} else {
-		logTrace "${app.label} Unexpected response: ${response.status}, response.data: ${response?.data}, ${response?.errorMessage}"
+		state.loggingStatus.details = "${response?.status}, response.data: ${response?.data}, ${response?.errorMessage}"
 	}
+	//logTrace "${app.label} Response: ${state?.loggingStatus?.details}"
 	//logTrace "${app.label} ${getWebAppName()} response.status: ${response.status} "
 	updateLoggingStatus(state, response)
 }
@@ -825,12 +703,19 @@ def updateLoggingStatus(state, response) {
 	def data
     def json
 	
-	if (response.hasProperty('json')){
-		//logTrace "${app.label} ${getWebAppName()} [updateLoggingStatus] JSON!!! \nstatus: ${status}"
-		json = response?.json ?: [:]
-	} else {
-		logTrace "${app.label} ${getWebAppName()} [updateLoggingStatus] NO! JSON \nstatus: ${status}"
-		status.success = false
+	try {
+		if (status.success == true){
+			//logTrace "${app.label} [updateLoggingStatus] hasProperty ${response}"
+			json = response?.json ?: [:]
+		} else if (response.hasProperty('json')){
+			logTrace "${app.label} [updateLoggingStatus] hasProperty ${response}"
+			json = response?.json ?: [:]
+		} else {
+			logTrace "${app.label} ${getWebAppName()} [updateLoggingStatus] NO! JSON \nstatus: ${status}"
+			status.success = false
+		}
+	} catch(err){
+		//logTrace "${app.label} [updateLoggingStatus] not a json!"
 	}
 	
 /*     try{ 
@@ -844,12 +729,12 @@ def updateLoggingStatus(state, response) {
 	
 	//json = response?.json ?: [:]
 	
-	//logTrace "${app.label} [updateLoggingStatus] state: ${state}; status: ${status}; json: ${json}"
+	logTrace "${app.label} [updateLoggingStatus] \nstate: ${state}; \nstatus: ${status}; \njson: ${json}"
 	
+	status.code = response?.status
 	if (json) {
     	data = json
-		status.success = data?.res
-        status.code = response?.status
+		status.success = data?.res      
         status.details = data.details ?: ''
         status.dropped = data.dropped ?: ''
 		//status.eventsArchived = data.eventsArchived
@@ -864,12 +749,12 @@ def updateLoggingStatus(state, response) {
 		//status.freeSpace = data.freeSpace
 		
 		if (data.error) {
-			logDebug "${app.label} ${getWebAppName()} Reported: ${data.error}"
+			logDebug "${app.label} Reported: ${data.error}"
 		}
         //logTrace "${app.label} [updateLoggingStatus] logged: ${status.eventsLogged}; status: ${status}"
 	} else {
 		status.success = false
-		logDebug "${app.label} The ${getWebAppName()} [updateLoggingStatus] postback has no data."
+		logDebug "${app.label} [updateLoggingStatus] postback has no data."
 	}	
 	state.loggingStatus = status
 	//logTrace "${app.label} [updateLoggingStatus] end: ${status}"
@@ -889,7 +774,7 @@ private logLoggingStatus() {
 	if (state.loggingStatus?.success) {
 		
 		logInfo "${app.label} logged ${status.result} ${status.eventsLogged} events between ${status.start} and ${status.end} in ${status.runTime}."
-		logDebug "${app.label} logged code: ${status.code} monitors: ${status?.m} dropped: ${status?.dropped}"
+		logDebug "${app.label} logged code: ${status.code} monitors: ${status?.eventsLogged} dropped: ${status?.dropped}"
 		//logTrace "${app.label} logged code: ${status.code} details: ${status?.details}"						
 	}
 	else {
@@ -908,6 +793,7 @@ private getFormattedLoggingStatus() {
 	return [
 		result: status?.success ? "Successful" : "Failed",
         code: status?.code ?: "empty",
+		details: status?.details ?: "",
 		start:  getFormattedLocalTime(safeToLong(status.firstEventTime)),
 		end:  getFormattedLocalTime(safeToLong(status.lastEventTime)),
 		runTime: "${((safeToLong(status.finished) - safeToLong(status.started)) / 1000)} seconds",
@@ -919,6 +805,7 @@ private getFormattedLoggingStatus() {
 	]
 }
 
+// initial Events
 private getInitEvents() {	
 	
 	def events = []
@@ -943,7 +830,7 @@ private getInitEvents() {
 	logTrace "${app.label} [getInitEvents] Retrieving Initial Events: ${events}"
 	return events?.unique()?.sort { it.time }
 }
-
+// current all Events
 private getCurrentEvents() {	
 	
 	def events = []
@@ -967,7 +854,7 @@ private getCurrentEvents() {
 	logTrace "${app.label} [getCurrentEvents] Retrieving Current Events: ${events}"
 	return events?.unique()?.sort { it.time }
 }
-
+// new Events since last upload 
 private getNewEvents(startDate, endDate) {	
 	
 	def events = []
@@ -992,6 +879,160 @@ private getNewEvents(startDate, endDate) {
 	logTrace "${app.label} [getNewEvents] Retrieving Events from ${startDate} to ${endDate} ${events}"
 	return events?.unique()?.sort { it.time }
 }
+// upload events
+def logInitEvents() {
+	def sender = 'logInitEvents'
+	logTrace "logInitialEvents start"
+	def status = state.loggingStatus ?: [:]
+	
+	// Move the date range to the next position unless the google script failed last time or was skipped due to the sheet being archived.
+	// if (!status.success || status.eventsArchived) {
+		// status.lastEventTime = status.firstEventTime
+	// }
+	
+	status.success = null
+	status.finished = null
+	status.eventsArchived = null
+	status.eventsLogged = 0
+	status.started = new Date().time
+	
+	//status.firstEventTime = getFirstEventTimeMS(status.lastEventTime)
+	
+	//status.lastEventTime = getNewLastEventTimeMS(status.started, (status.firstEventTime + 1000))
+	
+	//def startDate = new Date(status.firstEventTime + 1000)
+	//def endDate = new Date(status.lastEventTime)
+	
+	state.loggingStatus = status
+
+	def events = getInitEvents()
+	def eventCount = events?.size ?: 0
+	def actionMsg = eventCount > 0 ? ", posting them to ${getWebAppName()}" : ""
+	
+	logDebug "${app.label} SmartThings found initial devices ${String.format('%,d', eventCount)} ${actionMsg}"
+	
+	if (events) {
+		postEventsToLogger(status, sender, events)
+	}
+	else {		
+		state.loggingStatus.success = true
+		state.loggingStatus.finished = new Date().time
+	}
+}
+def logCurrentEvents() {
+	def sender = 'currentEvents'
+	logTrace "${app.label} logCurrentEvents start"
+	def status = state.loggingStatus ?: [:]
+	
+	// Move the date range to the next position unless the google script failed last time or was skipped due to the sheet being archived.
+	// if (!status.success || status.eventsArchived) {
+		// status.lastEventTime = status.firstEventTime
+	// }
+	
+	status.success = null
+	status.finished = null
+	status.eventsArchived = null
+	status.eventsLogged = 0
+	status.started = new Date().time
+	
+	//status.firstEventTime = getFirstEventTimeMS(status.lastEventTime)
+	
+	//status.lastEventTime = getNewLastEventTimeMS(status.started, (status.firstEventTime + 1000))
+	
+	//def startDate = new Date(status.firstEventTime + 1000)
+	//def endDate = new Date(status.lastEventTime)
+	
+	state.loggingStatus = status
+
+	def events = getCurrentEvents()
+	def eventCount = events?.size ?: 0
+	def actionMsg = eventCount > 0 ? ", posting them to ${getWebAppName()}" : ""
+	
+	logDebug "${app.label} SmartThings found current devices states ${String.format('%,d', eventCount)} ${actionMsg}"
+	
+	if (events) {
+		postEventsToLogger(status, sender, events)
+	}
+	else {		
+		state.loggingStatus.success = true
+		state.loggingStatus.finished = new Date().time
+	}
+}
+def logNewEvents() {	
+	def sender = 'newEvents'
+	logTrace "${app.label} logNewEvents start"
+	def status = state.loggingStatus ?: [:]
+	
+	// Move the date range to the next position unless the google script failed last time or was skipped due to the sheet being archived.
+	if (!status.success || status.eventsArchived) {
+		status.lastEventTime = status.firstEventTime
+	}
+	
+	status.success = null
+	status.finished = null
+	status.eventsArchived = null
+	status.eventsLogged = 0
+	status.started = new Date().time
+	status.lastEventTime = status?.lastEventTime ?: 0
+	
+	status.firstEventTime = getFirstEventTimeMS(status.lastEventTime)
+	
+	status.lastEventTime = getNewLastEventTimeMS(status.started, (status.firstEventTime + 1000))
+	
+	def startDate = new Date(status.firstEventTime + 1000)
+	def endDate = new Date(status.lastEventTime)
+	
+	state.loggingStatus = status
+	state.interval = endDate - startDate
+	status.interval = state.interval
+
+	def events = getNewEvents(startDate, endDate)
+	def eventCount = events?.size ?: 0
+	def actionMsg = eventCount > 0 ? ", posting them to ${getWebAppName()}" : ""
+	
+	logDebug "${app.label} SmartThings found ${String.format('%,d', eventCount)} events for status.interval interval, between ${getFormattedLocalTime(startDate.time)} and ${getFormattedLocalTime(endDate.time)}${actionMsg}"
+	
+	if (events) {
+		postEventsToLogger(status, sender, events)
+	}
+	else {		
+		state.loggingStatus.success = true
+		state.loggingStatus.finished = new Date().time
+	}
+}
+// uploading events
+private postEventsToLogger(status, sender, events) {
+	def hub = location.hubs[0]
+	def jsonOutput = new groovy.json.JsonOutput()
+	def jsonData = jsonOutput.toJson([
+		apiKey: settings?.apiKey,
+		node: settings?.node,
+		app: state.app,
+		version: "${version()}",
+        hubId: "${hub.id}",
+		sender: sender,
+        interval: settings?.logFrequency,
+		current: status?.firstEventTime,
+		lastfull: status?.lastEventTime,
+		//postBackUrl: "${state.endpoint}logger",
+		//archiveOptions: getArchiveOptions(),
+		//logDesc: (settings?.logDesc != false),
+		logReporting: (settings?.logReporting == true),
+		//deleteExtraColumns: (settings?.deleteExtraColumns == true),
+		events: events
+	])
+
+	def params = [
+		//uri: "${settings?.googleWebAppUrl}",
+		uri: "${settings?.loggerAppUrl}",
+		contentType: "application/json",
+		body: jsonData
+	]	
+	
+	logTrace("${app.label} [postEventsToLogger] params: ${params}")
+	asynchttp_v1.post(processLogEventsResponse, params)
+}
+
 
 private getEventDesc(event) {
 	if (settings?.useValueUnitDesc != false) {
